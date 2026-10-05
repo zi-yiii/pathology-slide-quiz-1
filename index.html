@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>切片刷題機</title>
+<style>
+:root{--ink:#2c2934;--muted:#6f6a78;--line:#e2dde7;--paper:#f8f6f2;--card:#fff;--purple:#665085;--deep:#30263e;--wash:#efeaf4;--ok:#2f7a5b;--bad:#b0413e;--hl:#ffcc00}
+@media (prefers-color-scheme:dark){:root{--ink:#ece8f2;--muted:#a7a0b2;--line:#3a3442;--paper:#18151c;--card:#221e28;--purple:#b49ad6;--deep:#120f16;--wash:#2b2533;--ok:#6fc29d;--bad:#e07a76}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.65 -apple-system,BlinkMacSystemFont,'PingFang TC','Microsoft JhengHei',sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:7px 14px;touch-action:manipulation}
+button:hover{border-color:var(--purple)}
+button.primary{background:var(--purple);border-color:var(--purple);color:#fff}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid #af99c6;outline-offset:2px}
+a{color:var(--purple)}
+header{background:var(--deep);color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;letter-spacing:1px}
+header h1 small{display:block;font-size:11px;font-weight:400;color:#d8ccdf;letter-spacing:1px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.controls select,.controls button{background:transparent;color:#f5effa;border:1px solid #796c85;border-radius:7px;padding:5px 9px}
+.controls select option{color:#000}
+.stats{font-size:12px;color:#d8ccdf}
+main{max-width:1500px;margin:auto;padding:20px 20px 60px}
+.qhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.qhead h2{margin:0;font-size:18px}
+.qhead p{margin:0;color:var(--muted);font-size:13px}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;padding:0;text-align:left;display:block;width:100%}
+.tile img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#eee}
+.tile span{display:flex;justify-content:space-between;padding:6px 10px;font-size:12px;color:var(--muted)}
+.answer-box{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin:18px 0 8px;align-items:end}
+.answer-box label{font-size:12px;color:var(--muted);display:block}
+.answer-box input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.reveal{display:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:14px}
+.reveal.show{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px}
+.reveal h3{margin:0 0 4px;font-size:22px}
+.reveal .zh{color:var(--muted);margin:0 0 10px}
+.reveal ol{padding-left:20px;margin:6px 0}
+.reveal li{margin:4px 0}
+.reveal .extra{color:var(--muted);font-size:13px}
+.mine{font-size:13px;background:var(--wash);border-radius:8px;padding:8px 10px;margin:10px 0}
+.map{position:relative}
+.map img{width:100%;display:block;border-radius:6px}
+.map .box{position:absolute;border:3px solid var(--hl);box-shadow:0 0 0 1px #000a}
+.map .box b{position:absolute;left:2px;top:0;font-size:12px;background:var(--hl);color:#000;padding:0 4px}
+.grade{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.grade .ok{border-color:var(--ok);color:var(--ok)}
+.grade .bad{border-color:var(--bad);color:var(--bad)}
+.note{font-size:12px;color:var(--muted)}
+dialog{border:0;border-radius:12px;padding:0;width:min(1400px,96vw);max-height:94vh;background:var(--card);color:var(--ink)}
+dialog::backdrop{background:#16121bdd}
+.modalbar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.modalbar .seg button[aria-pressed=true]{background:var(--purple);color:#fff;border-color:var(--purple)}
+#viewer{overflow:auto;max-height:80vh}
+#viewer img{display:block;width:100%;height:auto}
+@media(max-width:760px){
+ .tiles{grid-template-columns:1fr}
+ .answer-box{grid-template-columns:1fr}
+ .reveal.show{grid-template-columns:1fr}
+ main{padding:14px 16px 50px}
+}
+</style>
+</head>
+<body>
+<header>
+ <h1>切片刷題機<small>線上玻片 6×6 隨機三格 · 先認器官再下診斷</small></h1>
+ <div class="controls">
+  <select id="scope" aria-label="出題範圍"><option value="">全部講次</option></select>
+  <select id="mode" aria-label="出題方式"><option value="random">隨機</option><option value="wrong">只出答錯過的</option></select>
+  <span class="stats" id="stats"></span>
+ </div>
+</header>
+<main>
+ <div class="qhead"><h2 id="qtitle">第 1 題</h2><p>點圖放大；放大後可切換「整格 4×」與「格內 20×」。</p></div>
+ <div class="tiles" id="tiles"></div>
+ <form class="answer-box" id="form" autocomplete="off">
+  <div><label for="organ">Organ</label><input id="organ" placeholder="e.g. Lung"></div>
+  <div><label for="dx">Diagnosis</label><input id="dx" placeholder="e.g. Cryptococcosis"></div>
+  <button class="primary" type="submit" id="show">看答案</button>
+ </form>
+ <p class="note">三格來自同一張玻片；有些格子可能只有正常組織，請綜合三格判斷。</p>
+ <section class="reveal" id="reveal" aria-live="polite"></section>
+</main>
+<dialog id="lightbox" aria-label="放大檢視">
+ <div class="modalbar"><strong id="mtitle"></strong>
+  <div class="seg"><button id="m-lo" aria-pressed="true">整格 4×</button> <button id="m-hi" aria-pressed="false">格內 20×</button> <button id="m-close">關閉 ×</button></div></div>
+ <div id="viewer"><img id="mimg" alt=""></div>
+</dialog>
+<script src="quiz-data.js"></script>
+<script>
+'use strict';
+const Q=window.QUIZ_DATA,$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const GUIDE='https://zi-yiii.github.io/pathology-slide-guide/#';
+const get=(k,d)=>{try{return JSON.parse(localStorage.getItem('quiz:'+k))??d}catch{return d}},put=(k,v)=>{try{localStorage.setItem('quiz:'+k,JSON.stringify(v))}catch{}};
+let rec=get('rec',{}),n=0,cur=null,picks=[],modal=null;
+const lessons=[...new Map(Q.map(s=>[s.date,s.lesson])).entries()];
+lessons.forEach(([d,l])=>$('#scope').add(new Option(`${d.slice(0,2)}/${d.slice(2)} · ${l}`,d)));
+$('#scope').value=get('scope','');$('#scope').onchange=()=>{put('scope',$('#scope').value);next()};$('#mode').onchange=next;
+function pool(){let p=Q.filter(s=>!$('#scope').value||s.date===$('#scope').value);if($('#mode').value==='wrong'){const w=p.filter(s=>(rec[s.id]?.bad||0)>0);if(w.length)p=w}return p}
+function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function stats(){let ok=0,bad=0;Object.values(rec).forEach(r=>{ok+=r.ok||0;bad+=r.bad||0});$('#stats').textContent=`累計 ${ok} 對 / ${bad} 錯 · ${Q.length} 張玻片`}
+function src(s,c,hi){return `slides/${s.id}/r${c.r}c${c.c}${hi?'_20x':''}.jpg`}
+function next(){const p=pool();let s;do{s=p[Math.floor(Math.random()*p.length)]}while(p.length>1&&cur&&s.id===cur.id);cur=s;n++;
+ picks=shuffle(s.cells).slice(0,3);
+ $('#qtitle').textContent=`第 ${n} 題`;
+ $('#tiles').innerHTML=picks.map((c,i)=>`<button class="tile" data-i="${i}" aria-label="放大第 ${i+1} 格"><img src="${src(s,c)}" alt="第 ${i+1} 格"><span><b>${'ABC'[i]}</b><span>點圖放大 · 20× 可切換</span></span></button>`).join('');
+ document.querySelectorAll('.tile').forEach(b=>b.onclick=()=>open(Number(b.dataset.i)));
+ $('#organ').value='';$('#dx').value='';$('#reveal').className='reveal';$('#reveal').innerHTML='';$('#show').disabled=false;$('#organ').focus({preventScroll:true});window.scrollTo({top:0});
+ // 預載 20×
+ picks.forEach(c=>{const im=new Image();im.src=src(s,c,true)});
+}
+function open(i){modal=i;setHi(false);$('#lightbox').showModal()}
+function setHi(hi){const c=picks[modal];$('#mimg').src=src(cur,c,hi);$('#mtitle').textContent=`${'ABC'[modal]} · ${hi?`格內 20×（約 ${cur.hiMM[0]}×${cur.hiMM[1]} mm）`:`整格（約 ${cur.cellMM[0]}×${cur.cellMM[1]} mm）`}`;$('#m-lo').setAttribute('aria-pressed',!hi);$('#m-hi').setAttribute('aria-pressed',hi)}
+$('#m-lo').onclick=()=>setHi(false);$('#m-hi').onclick=()=>setHi(true);$('#m-close').onclick=()=>$('#lightbox').close();
+$('#form').onsubmit=e=>{e.preventDefault();const s=cur,g=s.grid;$('#show').disabled=true;
+ const boxes=picks.map((c,i)=>`<div class="box" style="left:${c.c/g*100}%;top:${c.r/g*100}%;width:${100/g}%;height:${100/g}%"><b>${'ABC'[i]}</b></div>`).join('');
+ const mine=($('#organ').value||$('#dx').value)?`<div class="mine">你的答案：${esc($('#organ').value)||'—'} ／ ${esc($('#dx').value)||'—'}</div>`:'';
+ $('#reveal').innerHTML=`<div><p class="note">${esc(s.id)} · ${s.date.slice(0,2)}/${s.date.slice(2)} ${esc(s.lesson)}</p><h3>${esc(s.organ)} · ${esc(s.diagnosis)}</h3><p class="zh">${esc(s.zh)}</p>${mine}<strong>Description（講義答案頁）</strong><ol>${s.pairs.map(p=>`<li>${esc(p)}</li>`).join('')}</ol>${s.extra.length?`<p class="extra">補充：${s.extra.map(esc).join('；')}</p>`:''}<p><a href="${GUIDE+s.id}" target="_blank" rel="noopener">到切片導讀看這一片 →</a></p>
+ <div class="grade"><button class="ok" id="g-ok">我答對了</button><button class="bad" id="g-bad">答錯／不確定</button><button class="primary" id="g-next">下一題 →</button></div></div>
+ <div><strong>三格在整張玻片的位置</strong><div class="map"><img src="slides/${s.id}/thumb.jpg" alt="${esc(s.id)} 全景">${boxes}</div><p class="note">黃框為本題三格；整張切成 ${g}×${g}，組織太少的格子不出題。</p></div>`;
+ $('#reveal').className='reveal show';
+ const grade=k=>{rec[s.id]=rec[s.id]||{};rec[s.id][k]=(rec[s.id][k]||0)+1;put('rec',rec);stats();next()};
+ $('#g-ok').onclick=()=>grade('ok');$('#g-bad').onclick=()=>grade('bad');$('#g-next').onclick=next;$('#reveal').scrollIntoView({behavior:'smooth',block:'start'})};
+stats();next();
+</script>
+</body>
+</html>
