@@ -8,6 +8,7 @@
 :root{--ink:#2c2934;--muted:#6f6a78;--line:#e2dde7;--paper:#f8f6f2;--card:#fff;--purple:#665085;--deep:#30263e;--wash:#efeaf4;--ok:#2f7a5b;--bad:#b0413e;--hl:#ffcc00}
 @media (prefers-color-scheme:dark){:root{--ink:#ece8f2;--muted:#a7a0b2;--line:#3a3442;--paper:#18151c;--card:#221e28;--purple:#b49ad6;--deep:#120f16;--wash:#2b2533;--ok:#6fc29d;--bad:#e07a76}}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.65 -apple-system,BlinkMacSystemFont,'PingFang TC','Microsoft JhengHei',sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:7px 14px;touch-action:manipulation}
@@ -29,6 +30,14 @@ main{max-width:1500px;margin:auto;padding:20px 20px 60px}
 .whole{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px}
 .whole figcaption{font-size:12px;color:var(--muted);margin-top:6px}
 .whole .map{max-width:900px;margin:auto;cursor:zoom-in}
+.full{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.fullbar{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);flex-wrap:wrap}
+.fullbar button{padding:3px 10px;font-size:13px}
+.pan{overflow:auto;max-height:78vh;background:#fff}
+.sheet{position:relative;margin:auto}
+.sheet .cell{position:absolute;padding:0;border:0;border-radius:0;background:none;outline:1px solid #0000}
+.sheet .cell:hover{outline:2px solid var(--hl);z-index:1}
+.sheet .cell img{display:block;width:100%;height:100%;object-fit:fill}
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;padding:0;text-align:left;display:block;width:100%}
 .tile img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#eee}
@@ -71,23 +80,25 @@ dialog::backdrop{background:#16121bdd}
 </head>
 <body>
 <header>
- <h1>切片刷題機<small>線上玻片 6×6 隨機三格 · 先認器官再下診斷</small></h1>
+ <h1>切片刷題機<small>線上玻片 6×6 · 三格模式／整張模式 · 先認器官再下診斷</small></h1>
  <div class="controls">
   <select id="scope" aria-label="出題範圍"><option value="">全部講次</option></select>
+  <select id="view" aria-label="顯示方式"><option value="three">三格模式</option><option value="full">整張模式</option></select>
   <select id="mode" aria-label="出題方式"><option value="random">隨機</option><option value="wrong">只出答錯過的</option></select>
   <span class="stats" id="stats"></span>
  </div>
 </header>
 <main>
- <div class="qhead"><h2 id="qtitle">第 1 題</h2><p>上方是整張玻片低倍全景，黃框是下面三格的位置。點格子放大後，可切換「整格」與「格內 20×」；20× 只拍格子裡最密的一小塊，不是整格。</p></div>
+ <div class="qhead"><h2 id="qtitle">第 1 題</h2><p id="qhelp"></p></div>
  <figure class="whole" id="whole"></figure>
  <div class="tiles" id="tiles"></div>
+ <div class="full" id="full" hidden><div class="fullbar"><button id="z-out" aria-label="縮小">−</button><span id="z-val">100%</span><button id="z-in" aria-label="放大">＋</button><span>拖曳或捲動移動；點任一格看大圖與 20×（局部）</span></div><div class="pan" id="pan"><div class="sheet" id="sheet"></div></div></div>
  <form class="answer-box" id="form" autocomplete="off">
   <div><label for="organ">Organ</label><input id="organ" placeholder="e.g. Lung"></div>
   <div><label for="dx">Diagnosis</label><input id="dx" placeholder="e.g. Cryptococcosis"></div>
   <button class="primary" type="submit" id="show">看答案</button>
  </form>
- <p class="note">三格來自同一張玻片；有些格子可能只有正常組織，請綜合全景與三格判斷。整張切成 6×6，組織太少的格子不出題。</p>
+ <p class="note" id="qnote"></p>
  <section class="reveal" id="reveal" aria-live="polite"></section>
 </main>
 <dialog id="lightbox" aria-label="放大檢視">
@@ -101,28 +112,49 @@ dialog::backdrop{background:#16121bdd}
 const Q=window.QUIZ_DATA,$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const GUIDE='https://zi-yiii.github.io/pathology-slide-guide/#';
 const get=(k,d)=>{try{return JSON.parse(localStorage.getItem('quiz:'+k))??d}catch{return d}},put=(k,v)=>{try{localStorage.setItem('quiz:'+k,JSON.stringify(v))}catch{}};
-let rec=get('rec',{}),n=0,cur=null,picks=[],modal=null;
+let rec=get('rec',{}),n=0,cur=null,picks=[],modal=null,zoom=1;
+const ZOOMS=[1,1.5,2,3,4],HELP={three:['上方是整張玻片低倍全景，黃框是下面三格的位置。點格子放大後，可切換「整格」與「格內 20×」；20× 只拍格子裡最密的一小塊，不是整格。','三格來自同一張玻片；有些格子可能只有正常組織，請綜合全景與三格判斷。整張切成 6×6，組織太少的格子不出題。'],
+ full:['整張模式：把這張玻片所有可出題的格子拼回原位（約 4× 物鏡），可縮放、拖曳。點任一格可看大圖與格內 20×（局部）。','空白格是組織太少、未存圖的區域，多為玻片邊緣白底。一題需載入二三十張圖，手機網路較慢。']};
 const lessons=[...new Map(Q.map(s=>[s.date,s.lesson])).entries()];
 lessons.forEach(([d,l])=>$('#scope').add(new Option(`${d.slice(0,2)}/${d.slice(2)} · ${l}`,d)));
-$('#scope').value=get('scope','');$('#scope').onchange=()=>{put('scope',$('#scope').value);next()};$('#mode').onchange=next;
+$('#scope').value=get('scope','');$('#scope').onchange=()=>{put('scope',$('#scope').value);next()};$('#mode').onchange=next;$('#view').value=get('view','three');$('#view').onchange=()=>{put('view',$('#view').value);render()};
 function pool(){let p=Q.filter(s=>!$('#scope').value||s.date===$('#scope').value);if($('#mode').value==='wrong'){const w=p.filter(s=>(rec[s.id]?.bad||0)>0);if(w.length)p=w}return p}
 function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function stats(){let ok=0,bad=0;Object.values(rec).forEach(r=>{ok+=r.ok||0;bad+=r.bad||0});$('#stats').textContent=`累計 ${ok} 對 / ${bad} 錯 · ${Q.length} 張玻片`}
 function src(s,c,hi){return `slides/${s.id}/r${c.r}c${c.c}${hi?'_20x':''}.jpg`}
 function next(){const p=pool();let s;do{s=p[Math.floor(Math.random()*p.length)]}while(p.length>1&&cur&&s.id===cur.id);cur=s;n++;
- picks=shuffle(s.cells).slice(0,3);
+ picks=shuffle(s.cells).slice(0,3);zoom=1;
  $('#qtitle').textContent=`第 ${n} 題`;
- const g=s.grid;$('#whole').innerHTML=`<div class="map" id="wmap"><img src="slides/${s.id}/overview.jpg" alt="整張玻片低倍全景">${picks.map((c,i)=>`<div class="box" style="left:${c.c/g*100}%;top:${c.r/g*100}%;width:${100/g}%;height:${100/g}%"><b>${'ABC'[i]}</b></div>`).join('')}</div><figcaption>整張玻片低倍全景（點圖放大）</figcaption>`;
- $('#wmap').onclick=()=>{modal=-1;$('#mimg').src=`slides/${s.id}/overview.jpg`;$('#mtitle').textContent='整張玻片低倍全景';$('#m-lo').hidden=$('#m-hi').hidden=true;$('#hibox').hidden=true;$('#mhint').hidden=true;$('#lightbox').showModal()};
- $('#tiles').innerHTML=picks.map((c,i)=>`<button class="tile" data-i="${i}" aria-label="放大第 ${i+1} 格"><img src="${src(s,c)}" alt="第 ${i+1} 格"><span><b>${'ABC'[i]}</b><span>點圖放大 · 可看格內局部 20×</span></span></button>`).join('');
- document.querySelectorAll('.tile').forEach(b=>b.onclick=()=>open(Number(b.dataset.i)));
  $('#organ').value='';$('#dx').value='';$('#reveal').className='reveal';$('#reveal').innerHTML='';$('#show').disabled=false;$('#organ').focus({preventScroll:true});window.scrollTo({top:0});
+ render()}
+function render(){const s=cur,g=s.grid,full=$('#view').value==='full';
+ [$('#qhelp').textContent,$('#qnote').textContent]=HELP[full?'full':'three'];
+ $('#whole').hidden=full;$('#tiles').hidden=full;$('#full').hidden=!full;
+ if(full){renderFull();return}$('#whole').innerHTML=`<div class="map" id="wmap"><img src="slides/${s.id}/overview.jpg" alt="整張玻片低倍全景">${picks.map((c,i)=>`<div class="box" style="left:${c.c/g*100}%;top:${c.r/g*100}%;width:${100/g}%;height:${100/g}%"><b>${'ABC'[i]}</b></div>`).join('')}</div><figcaption>整張玻片低倍全景（點圖放大）</figcaption>`;
+ $('#wmap').onclick=()=>{modal=null;$('#mimg').src=`slides/${s.id}/overview.jpg`;$('#mtitle').textContent='整張玻片低倍全景';$('#m-lo').hidden=$('#m-hi').hidden=true;$('#hibox').hidden=true;$('#mhint').hidden=true;$('#lightbox').showModal()};
+ $('#tiles').innerHTML=picks.map((c,i)=>`<button class="tile" data-i="${i}" aria-label="放大第 ${i+1} 格"><img src="${src(s,c)}" alt="第 ${i+1} 格"><span><b>${'ABC'[i]}</b><span>點圖放大 · 可看格內局部 20×</span></span></button>`).join('');
+ document.querySelectorAll('.tile').forEach(b=>b.onclick=()=>open(picks[Number(b.dataset.i)],'ABC'[Number(b.dataset.i)]));
  // 預載 20×
  picks.forEach(c=>{const im=new Image();im.src=src(s,c,true)});
 }
-function open(i){modal=i;$('#m-lo').hidden=$('#m-hi').hidden=false;setHi(false);$('#lightbox').showModal()}
-function setHi(hi){const c=picks[modal],g=cur.grid,im=$('#mimg'),bx=$('#hibox');im.src=src(cur,c,hi);
- $('#mtitle').textContent=`${'ABC'[modal]} · ${hi?`格內 20×（約 ${cur.hiMM[0]}×${cur.hiMM[1]} mm）`:`整格（約 ${cur.cellMM[0]}×${cur.cellMM[1]} mm）`}`;
+function renderFull(){const s=cur,g=s.grid;
+ $('#sheet').style.cssText=`width:${zoom*100}%;aspect-ratio:${s.cellMM[0]}/${s.cellMM[1]}`;
+ $('#sheet').innerHTML=s.cells.map((c,i)=>`<button class="cell" data-k="${i}" style="left:${c.c/g*100}%;top:${c.r/g*100}%;width:${100/g}%;height:${100/g}%" aria-label="第 ${c.r+1} 列第 ${c.c+1} 欄"><img loading="lazy" src="${src(s,c)}" alt=""></button>`).join('');
+ document.querySelectorAll('#sheet .cell').forEach(b=>b.onclick=()=>{if(dragged)return;const c=s.cells[Number(b.dataset.k)];open(c,`第 ${c.r+1} 列第 ${c.c+1} 欄`)});
+ $('#z-val').textContent=Math.round(zoom*100)+'%'}
+function setZoom(d){const pan=$('#pan'),i=Math.max(0,Math.min(ZOOMS.length-1,ZOOMS.indexOf(zoom)+d));if(ZOOMS[i]===zoom)return;
+ const cx=(pan.scrollLeft+pan.clientWidth/2)/pan.scrollWidth,cy=(pan.scrollTop+pan.clientHeight/2)/pan.scrollHeight;zoom=ZOOMS[i];
+ $('#sheet').style.width=zoom*100+'%';$('#z-val').textContent=Math.round(zoom*100)+'%';
+ pan.scrollLeft=cx*pan.scrollWidth-pan.clientWidth/2;pan.scrollTop=cy*pan.scrollHeight-pan.clientHeight/2}
+$('#z-in').onclick=()=>setZoom(1);$('#z-out').onclick=()=>setZoom(-1);
+// 滑鼠拖曳平移（觸控用原生捲動）
+let drag=null,dragged=false;
+$('#pan').addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')return;drag={x:e.clientX,y:e.clientY,l:$('#pan').scrollLeft,t:$('#pan').scrollTop};dragged=false});
+window.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4)dragged=true;$('#pan').scrollLeft=drag.l-dx;$('#pan').scrollTop=drag.t-dy});
+window.addEventListener('pointerup',()=>{drag=null;setTimeout(()=>dragged=false,0)});
+function open(c,label){modal={c,label};$('#m-lo').hidden=$('#m-hi').hidden=false;setHi(false);$('#lightbox').showModal()}
+function setHi(hi){const c=modal.c,g=cur.grid,im=$('#mimg'),bx=$('#hibox');im.src=src(cur,c,hi);
+ $('#mtitle').textContent=`${modal.label} · ${hi?`格內 20×（約 ${cur.hiMM[0]}×${cur.hiMM[1]} mm）`:`整格（約 ${cur.cellMM[0]}×${cur.cellMM[1]} mm）`}`;
  $('#mhint').textContent=hi?'20× 只涵蓋整格中的一小塊（整格裡黃框的位置）；其他區域請看整格圖。':'黃框是「格內 20×」拍攝的範圍，只占整格的一小部分。';$('#mhint').hidden=false;
  const fx=c.hx*g-c.c,fy=c.hy*g-c.r,w=cur.hiMM[0]/cur.cellMM[0],h=cur.hiMM[1]/cur.cellMM[1];
  Object.assign(bx.style,{left:`${Math.max(0,fx-w/2)*100}%`,top:`${Math.max(0,fy-h/2)*100}%`,width:`${w*100}%`,height:`${h*100}%`});bx.hidden=hi;
