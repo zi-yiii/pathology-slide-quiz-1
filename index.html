@@ -26,6 +26,9 @@ main{max-width:1500px;margin:auto;padding:20px 20px 60px}
 .qhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
 .qhead h2{margin:0;font-size:18px}
 .qhead p{margin:0;color:var(--muted);font-size:13px}
+.whole{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px}
+.whole figcaption{font-size:12px;color:var(--muted);margin-top:6px}
+.whole .map{max-width:900px;margin:auto;cursor:zoom-in}
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;padding:0;text-align:left;display:block;width:100%}
 .tile img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#eee}
@@ -34,7 +37,7 @@ main{max-width:1500px;margin:auto;padding:20px 20px 60px}
 .answer-box label{font-size:12px;color:var(--muted);display:block}
 .answer-box input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
 .reveal{display:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:14px}
-.reveal.show{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px}
+.reveal.show{display:block}
 .reveal h3{margin:0 0 4px;font-size:22px}
 .reveal .zh{color:var(--muted);margin:0 0 10px}
 .reveal ol{padding-left:20px;margin:6px 0}
@@ -58,7 +61,6 @@ dialog::backdrop{background:#16121bdd}
 @media(max-width:760px){
  .tiles{grid-template-columns:1fr}
  .answer-box{grid-template-columns:1fr}
- .reveal.show{grid-template-columns:1fr}
  main{padding:14px 16px 50px}
 }
 </style>
@@ -73,14 +75,15 @@ dialog::backdrop{background:#16121bdd}
  </div>
 </header>
 <main>
- <div class="qhead"><h2 id="qtitle">第 1 題</h2><p>點圖放大；放大後可切換「整格 4×」與「格內 20×」。</p></div>
+ <div class="qhead"><h2 id="qtitle">第 1 題</h2><p>上方是整張玻片低倍全景，黃框是下面三格的位置。點圖放大；格子放大後可切換「整格」與「格內 20×」。</p></div>
+ <figure class="whole" id="whole"></figure>
  <div class="tiles" id="tiles"></div>
  <form class="answer-box" id="form" autocomplete="off">
   <div><label for="organ">Organ</label><input id="organ" placeholder="e.g. Lung"></div>
   <div><label for="dx">Diagnosis</label><input id="dx" placeholder="e.g. Cryptococcosis"></div>
   <button class="primary" type="submit" id="show">看答案</button>
  </form>
- <p class="note">三格來自同一張玻片；有些格子可能只有正常組織，請綜合三格判斷。</p>
+ <p class="note">三格來自同一張玻片；有些格子可能只有正常組織，請綜合全景與三格判斷。整張切成 6×6，組織太少的格子不出題。</p>
  <section class="reveal" id="reveal" aria-live="polite"></section>
 </main>
 <dialog id="lightbox" aria-label="放大檢視">
@@ -105,21 +108,22 @@ function src(s,c,hi){return `slides/${s.id}/r${c.r}c${c.c}${hi?'_20x':''}.jpg`}
 function next(){const p=pool();let s;do{s=p[Math.floor(Math.random()*p.length)]}while(p.length>1&&cur&&s.id===cur.id);cur=s;n++;
  picks=shuffle(s.cells).slice(0,3);
  $('#qtitle').textContent=`第 ${n} 題`;
+ const g=s.grid;$('#whole').innerHTML=`<div class="map" id="wmap"><img src="slides/${s.id}/overview.jpg" alt="整張玻片低倍全景">${picks.map((c,i)=>`<div class="box" style="left:${c.c/g*100}%;top:${c.r/g*100}%;width:${100/g}%;height:${100/g}%"><b>${'ABC'[i]}</b></div>`).join('')}</div><figcaption>整張玻片低倍全景（點圖放大）</figcaption>`;
+ $('#wmap').onclick=()=>{modal=-1;$('#mimg').src=`slides/${s.id}/overview.jpg`;$('#mtitle').textContent='整張玻片低倍全景';$('#m-lo').hidden=$('#m-hi').hidden=true;$('#lightbox').showModal()};
  $('#tiles').innerHTML=picks.map((c,i)=>`<button class="tile" data-i="${i}" aria-label="放大第 ${i+1} 格"><img src="${src(s,c)}" alt="第 ${i+1} 格"><span><b>${'ABC'[i]}</b><span>點圖放大 · 20× 可切換</span></span></button>`).join('');
  document.querySelectorAll('.tile').forEach(b=>b.onclick=()=>open(Number(b.dataset.i)));
  $('#organ').value='';$('#dx').value='';$('#reveal').className='reveal';$('#reveal').innerHTML='';$('#show').disabled=false;$('#organ').focus({preventScroll:true});window.scrollTo({top:0});
  // 預載 20×
  picks.forEach(c=>{const im=new Image();im.src=src(s,c,true)});
 }
-function open(i){modal=i;setHi(false);$('#lightbox').showModal()}
+function open(i){modal=i;$('#m-lo').hidden=$('#m-hi').hidden=false;setHi(false);$('#lightbox').showModal()}
 function setHi(hi){const c=picks[modal];$('#mimg').src=src(cur,c,hi);$('#mtitle').textContent=`${'ABC'[modal]} · ${hi?`格內 20×（約 ${cur.hiMM[0]}×${cur.hiMM[1]} mm）`:`整格（約 ${cur.cellMM[0]}×${cur.cellMM[1]} mm）`}`;$('#m-lo').setAttribute('aria-pressed',!hi);$('#m-hi').setAttribute('aria-pressed',hi)}
 $('#m-lo').onclick=()=>setHi(false);$('#m-hi').onclick=()=>setHi(true);$('#m-close').onclick=()=>$('#lightbox').close();
-$('#form').onsubmit=e=>{e.preventDefault();const s=cur,g=s.grid;$('#show').disabled=true;
- const boxes=picks.map((c,i)=>`<div class="box" style="left:${c.c/g*100}%;top:${c.r/g*100}%;width:${100/g}%;height:${100/g}%"><b>${'ABC'[i]}</b></div>`).join('');
+$('#form').onsubmit=e=>{e.preventDefault();const s=cur;$('#show').disabled=true;
  const mine=($('#organ').value||$('#dx').value)?`<div class="mine">你的答案：${esc($('#organ').value)||'—'} ／ ${esc($('#dx').value)||'—'}</div>`:'';
  $('#reveal').innerHTML=`<div><p class="note">${esc(s.id)} · ${s.date.slice(0,2)}/${s.date.slice(2)} ${esc(s.lesson)}</p><h3>${esc(s.organ)} · ${esc(s.diagnosis)}</h3><p class="zh">${esc(s.zh)}</p>${mine}<strong>Description（講義答案頁）</strong><ol>${s.pairs.map(p=>`<li>${esc(p)}</li>`).join('')}</ol>${s.extra.length?`<p class="extra">補充：${s.extra.map(esc).join('；')}</p>`:''}<p><a href="${GUIDE+s.id}" target="_blank" rel="noopener">到切片導讀看這一片 →</a></p>
  <div class="grade"><button class="ok" id="g-ok">我答對了</button><button class="bad" id="g-bad">答錯／不確定</button><button class="primary" id="g-next">下一題 →</button></div></div>
- <div><strong>三格在整張玻片的位置</strong><div class="map"><img src="slides/${s.id}/thumb.jpg" alt="${esc(s.id)} 全景">${boxes}</div><p class="note">黃框為本題三格；整張切成 ${g}×${g}，組織太少的格子不出題。</p></div>`;
+`;
  $('#reveal').className='reveal show';
  const grade=k=>{rec[s.id]=rec[s.id]||{};rec[s.id][k]=(rec[s.id][k]||0)+1;put('rec',rec);stats();next()};
  $('#g-ok').onclick=()=>grade('ok');$('#g-bad').onclick=()=>grade('bad');$('#g-next').onclick=next;$('#reveal').scrollIntoView({behavior:'smooth',block:'start'})};
