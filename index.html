@@ -57,6 +57,10 @@ dialog::backdrop{background:#16121bdd}
 .modalbar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .modalbar .seg button[aria-pressed=true]{background:var(--purple);color:#fff;border-color:var(--purple)}
 #viewer{overflow:auto;max-height:80vh}
+#viewer .stage{position:relative}
+#viewer .hibox{position:absolute;border:3px solid var(--hl);box-shadow:0 0 0 1px #000a;pointer-events:none}
+#viewer .hibox b{position:absolute;left:0;top:-22px;font-size:12px;background:var(--hl);color:#000;padding:0 4px;white-space:nowrap}
+.hint{font-size:12px;color:var(--muted);padding:6px 14px;margin:0;border-bottom:1px solid var(--line)}
 #viewer img{display:block;width:100%;height:auto}
 @media(max-width:760px){
  .tiles{grid-template-columns:1fr}
@@ -75,7 +79,7 @@ dialog::backdrop{background:#16121bdd}
  </div>
 </header>
 <main>
- <div class="qhead"><h2 id="qtitle">第 1 題</h2><p>上方是整張玻片低倍全景，黃框是下面三格的位置。點圖放大；格子放大後可切換「整格」與「格內 20×」。</p></div>
+ <div class="qhead"><h2 id="qtitle">第 1 題</h2><p>上方是整張玻片低倍全景，黃框是下面三格的位置。點格子放大後，可切換「整格」與「格內 20×」；20× 只拍格子裡最密的一小塊，不是整格。</p></div>
  <figure class="whole" id="whole"></figure>
  <div class="tiles" id="tiles"></div>
  <form class="answer-box" id="form" autocomplete="off">
@@ -88,8 +92,8 @@ dialog::backdrop{background:#16121bdd}
 </main>
 <dialog id="lightbox" aria-label="放大檢視">
  <div class="modalbar"><strong id="mtitle"></strong>
-  <div class="seg"><button id="m-lo" aria-pressed="true">整格 4×</button> <button id="m-hi" aria-pressed="false">格內 20×</button> <button id="m-close">關閉 ×</button></div></div>
- <div id="viewer"><img id="mimg" alt=""></div>
+  <div class="seg"><button id="m-lo" aria-pressed="true">整格 4×</button> <button id="m-hi" aria-pressed="false">格內 20×（局部）</button> <button id="m-close">關閉 ×</button></div></div>
+ <p class="hint" id="mhint"></p><div id="viewer"><div class="stage"><img id="mimg" alt=""><div class="hibox" id="hibox" hidden><b>20× 範圍</b></div></div></div>
 </dialog>
 <script src="quiz-data.js"></script>
 <script>
@@ -109,15 +113,20 @@ function next(){const p=pool();let s;do{s=p[Math.floor(Math.random()*p.length)]}
  picks=shuffle(s.cells).slice(0,3);
  $('#qtitle').textContent=`第 ${n} 題`;
  const g=s.grid;$('#whole').innerHTML=`<div class="map" id="wmap"><img src="slides/${s.id}/overview.jpg" alt="整張玻片低倍全景">${picks.map((c,i)=>`<div class="box" style="left:${c.c/g*100}%;top:${c.r/g*100}%;width:${100/g}%;height:${100/g}%"><b>${'ABC'[i]}</b></div>`).join('')}</div><figcaption>整張玻片低倍全景（點圖放大）</figcaption>`;
- $('#wmap').onclick=()=>{modal=-1;$('#mimg').src=`slides/${s.id}/overview.jpg`;$('#mtitle').textContent='整張玻片低倍全景';$('#m-lo').hidden=$('#m-hi').hidden=true;$('#lightbox').showModal()};
- $('#tiles').innerHTML=picks.map((c,i)=>`<button class="tile" data-i="${i}" aria-label="放大第 ${i+1} 格"><img src="${src(s,c)}" alt="第 ${i+1} 格"><span><b>${'ABC'[i]}</b><span>點圖放大 · 20× 可切換</span></span></button>`).join('');
+ $('#wmap').onclick=()=>{modal=-1;$('#mimg').src=`slides/${s.id}/overview.jpg`;$('#mtitle').textContent='整張玻片低倍全景';$('#m-lo').hidden=$('#m-hi').hidden=true;$('#hibox').hidden=true;$('#mhint').hidden=true;$('#lightbox').showModal()};
+ $('#tiles').innerHTML=picks.map((c,i)=>`<button class="tile" data-i="${i}" aria-label="放大第 ${i+1} 格"><img src="${src(s,c)}" alt="第 ${i+1} 格"><span><b>${'ABC'[i]}</b><span>點圖放大 · 可看格內局部 20×</span></span></button>`).join('');
  document.querySelectorAll('.tile').forEach(b=>b.onclick=()=>open(Number(b.dataset.i)));
  $('#organ').value='';$('#dx').value='';$('#reveal').className='reveal';$('#reveal').innerHTML='';$('#show').disabled=false;$('#organ').focus({preventScroll:true});window.scrollTo({top:0});
  // 預載 20×
  picks.forEach(c=>{const im=new Image();im.src=src(s,c,true)});
 }
 function open(i){modal=i;$('#m-lo').hidden=$('#m-hi').hidden=false;setHi(false);$('#lightbox').showModal()}
-function setHi(hi){const c=picks[modal];$('#mimg').src=src(cur,c,hi);$('#mtitle').textContent=`${'ABC'[modal]} · ${hi?`格內 20×（約 ${cur.hiMM[0]}×${cur.hiMM[1]} mm）`:`整格（約 ${cur.cellMM[0]}×${cur.cellMM[1]} mm）`}`;$('#m-lo').setAttribute('aria-pressed',!hi);$('#m-hi').setAttribute('aria-pressed',hi)}
+function setHi(hi){const c=picks[modal],g=cur.grid,im=$('#mimg'),bx=$('#hibox');im.src=src(cur,c,hi);
+ $('#mtitle').textContent=`${'ABC'[modal]} · ${hi?`格內 20×（約 ${cur.hiMM[0]}×${cur.hiMM[1]} mm）`:`整格（約 ${cur.cellMM[0]}×${cur.cellMM[1]} mm）`}`;
+ $('#mhint').textContent=hi?'20× 只涵蓋整格中的一小塊（整格裡黃框的位置）；其他區域請看整格圖。':'黃框是「格內 20×」拍攝的範圍，只占整格的一小部分。';$('#mhint').hidden=false;
+ const fx=c.hx*g-c.c,fy=c.hy*g-c.r,w=cur.hiMM[0]/cur.cellMM[0],h=cur.hiMM[1]/cur.cellMM[1];
+ Object.assign(bx.style,{left:`${Math.max(0,fx-w/2)*100}%`,top:`${Math.max(0,fy-h/2)*100}%`,width:`${w*100}%`,height:`${h*100}%`});bx.hidden=hi;
+ $('#m-lo').setAttribute('aria-pressed',!hi);$('#m-hi').setAttribute('aria-pressed',hi)}
 $('#m-lo').onclick=()=>setHi(false);$('#m-hi').onclick=()=>setHi(true);$('#m-close').onclick=()=>$('#lightbox').close();
 $('#form').onsubmit=e=>{e.preventDefault();const s=cur;$('#show').disabled=true;
  const mine=($('#organ').value||$('#dx').value)?`<div class="mine">你的答案：${esc($('#organ').value)||'—'} ／ ${esc($('#dx').value)||'—'}</div>`:'';
