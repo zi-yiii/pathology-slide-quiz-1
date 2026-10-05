@@ -30,6 +30,15 @@ main{max-width:1500px;margin:auto;padding:20px 20px 60px}
 .whole{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px}
 .whole figcaption{font-size:12px;color:var(--muted);margin-top:6px}
 .whole .map{max-width:900px;margin:auto;cursor:zoom-in}
+#log-btn{background:#ffffff1a}
+#log-btn.unsaved{border-color:var(--hl);color:var(--hl)}
+#logbox{width:min(1000px,96vw)}
+#logbox .body{padding:14px 16px;overflow:auto;max-height:70vh}
+#logbox table{border-collapse:collapse;width:100%;font-size:13px}
+#logbox th,#logbox td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+#logbox .sum{margin:0 0 10px;font-size:14px}
+#logbox .acts{display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line)}
+.g-ok{color:var(--ok)}.g-bad{color:var(--bad)}
 .full{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .fullbar{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);flex-wrap:wrap}
 .fullbar button{padding:3px 10px;font-size:13px}
@@ -85,6 +94,7 @@ dialog::backdrop{background:#16121bdd}
   <select id="scope" aria-label="出題範圍"><option value="">全部講次</option></select>
   <select id="view" aria-label="顯示方式"><option value="three">三格模式</option><option value="full">整張模式</option></select>
   <select id="mode" aria-label="出題方式"><option value="random">隨機</option><option value="wrong">只出答錯過的</option></select>
+  <button id="log-btn" type="button">本輪紀錄 0</button>
   <span class="stats" id="stats"></span>
  </div>
 </header>
@@ -106,14 +116,21 @@ dialog::backdrop{background:#16121bdd}
   <div class="seg"><button id="m-lo" aria-pressed="true">整格 4×</button> <button id="m-hi" aria-pressed="false">格內 20×（局部）</button> <button id="m-close">關閉 ×</button></div></div>
  <p class="hint" id="mhint"></p><div id="viewer"><div class="stage"><img id="mimg" alt=""><div class="hibox" id="hibox" hidden><b>20× 範圍</b></div></div></div>
 </dialog>
+<dialog id="logbox" aria-label="本輪紀錄">
+ <div class="modalbar"><strong>本輪紀錄</strong><button id="log-close">關閉 ×</button></div>
+ <div class="body" id="log-body"></div>
+ <div class="acts"><button class="primary" id="log-csv">暫停並下載 CSV</button><button id="log-copy">複製文字</button><button id="log-new">開始新一輪</button><span class="note" id="log-msg"></span></div>
+</dialog>
 <script src="quiz-data.js"></script>
 <script>
 'use strict';
 const Q=window.QUIZ_DATA,$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const GUIDE='https://zi-yiii.github.io/pathology-slide-guide/#';
 const get=(k,d)=>{try{return JSON.parse(localStorage.getItem('quiz:'+k))??d}catch{return d}},put=(k,v)=>{try{localStorage.setItem('quiz:'+k,JSON.stringify(v))}catch{}};
-let rec=get('rec',{}),n=0,cur=null,picks=[],modal=null,zoom=1;
-const ZOOMS=[1,1.5,2,3,4],HELP={three:['上方是整張玻片低倍全景，黃框是下面三格的位置。點格子放大後，可切換「整格」與「格內 20×」；20× 只拍格子裡最密的一小塊，不是整格。','三格來自同一張玻片；有些格子可能只有正常組織，請綜合全景與三格判斷。整張切成 6×6，組織太少的格子不出題。'],
+let session=get('session',null);if(!session||!Array.isArray(session.items))session={start:new Date().toISOString(),items:[],exported:true};
+const saveSession=()=>{put('session',session);const b=$('#log-btn'),k=session.items.length;b.textContent=`本輪紀錄 ${k}${k&&!session.exported?' ・未匯出':''}`;b.classList.toggle('unsaved',k>0&&!session.exported)};
+let revealed=false,rec=get('rec',{}),n=0,cur=null,picks=[],modal=null,zoom=1;
+const ZOOMS=[1,1.5,2,3,4],HELP={three:['只看同一張玻片隨機的三格作答；整張全景要按「看答案」後才出現，避免變成認低倍輪廓。點格子放大後，可切換「整格」與「格內 20×」；20× 只拍格子裡最密的一小塊，不是整格。','有些格子可能只有正常組織，請綜合三格判斷。整張切成 6×6，組織太少的格子不出題。'],
  full:['整張模式：把這張玻片所有可出題的格子拼回原位（約 4× 物鏡），可縮放、拖曳。點任一格可看大圖與格內 20×（局部）。','空白格是組織太少、未存圖的區域，多為玻片邊緣白底。一題需載入二三十張圖，手機網路較慢。']};
 const lessons=[...new Map(Q.map(s=>[s.date,s.lesson])).entries()];
 lessons.forEach(([d,l])=>$('#scope').add(new Option(`${d.slice(0,2)}/${d.slice(2)} · ${l}`,d)));
@@ -123,14 +140,14 @@ function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Ma
 function stats(){let ok=0,bad=0;Object.values(rec).forEach(r=>{ok+=r.ok||0;bad+=r.bad||0});$('#stats').textContent=`累計 ${ok} 對 / ${bad} 錯 · ${Q.length} 張玻片`}
 function src(s,c,hi){return `slides/${s.id}/r${c.r}c${c.c}${hi?'_20x':''}.jpg`}
 function next(){const p=pool();let s;do{s=p[Math.floor(Math.random()*p.length)]}while(p.length>1&&cur&&s.id===cur.id);cur=s;n++;
- picks=shuffle(s.cells).slice(0,3);zoom=1;
+ picks=shuffle(s.cells).slice(0,3);zoom=1;revealed=false;
  $('#qtitle').textContent=`第 ${n} 題`;
  $('#organ').value='';$('#dx').value='';$('#reveal').className='reveal';$('#reveal').innerHTML='';$('#show').disabled=false;$('#organ').focus({preventScroll:true});window.scrollTo({top:0});
  render()}
 function render(){const s=cur,g=s.grid,full=$('#view').value==='full';
  [$('#qhelp').textContent,$('#qnote').textContent]=HELP[full?'full':'three'];
- $('#whole').hidden=full;$('#tiles').hidden=full;$('#full').hidden=!full;
- if(full){renderFull();return}$('#whole').innerHTML=`<div class="map" id="wmap"><img src="slides/${s.id}/overview.jpg" alt="整張玻片低倍全景">${picks.map((c,i)=>`<div class="box" style="left:${c.c/g*100}%;top:${c.r/g*100}%;width:${100/g}%;height:${100/g}%"><b>${'ABC'[i]}</b></div>`).join('')}</div><figcaption>整張玻片低倍全景（點圖放大）</figcaption>`;
+ $('#whole').hidden=full||!revealed;$('#tiles').hidden=full;$('#full').hidden=!full;
+ if(full){renderFull();return}$('#whole').innerHTML=`<div class="map" id="wmap"><img src="slides/${s.id}/overview.jpg" alt="整張玻片低倍全景">${picks.map((c,i)=>`<div class="box" style="left:${c.c/g*100}%;top:${c.r/g*100}%;width:${100/g}%;height:${100/g}%"><b>${'ABC'[i]}</b></div>`).join('')}</div><figcaption>答案揭曉：整張玻片低倍全景，黃框是本題三格的位置（點圖放大）</figcaption>`;
  $('#wmap').onclick=()=>{modal=null;$('#mimg').src=`slides/${s.id}/overview.jpg`;$('#mtitle').textContent='整張玻片低倍全景';$('#m-lo').hidden=$('#m-hi').hidden=true;$('#hibox').hidden=true;$('#mhint').hidden=true;$('#lightbox').showModal()};
  $('#tiles').innerHTML=picks.map((c,i)=>`<button class="tile" data-i="${i}" aria-label="放大第 ${i+1} 格"><img src="${src(s,c)}" alt="第 ${i+1} 格"><span><b>${'ABC'[i]}</b><span>點圖放大 · 可看格內局部 20×</span></span></button>`).join('');
  document.querySelectorAll('.tile').forEach(b=>b.onclick=()=>open(picks[Number(b.dataset.i)],'ABC'[Number(b.dataset.i)]));
@@ -161,14 +178,32 @@ function setHi(hi){const c=modal.c,g=cur.grid,im=$('#mimg'),bx=$('#hibox');im.sr
  $('#m-lo').setAttribute('aria-pressed',!hi);$('#m-hi').setAttribute('aria-pressed',hi)}
 $('#m-lo').onclick=()=>setHi(false);$('#m-hi').onclick=()=>setHi(true);$('#m-close').onclick=()=>$('#lightbox').close();
 $('#form').onsubmit=e=>{e.preventDefault();const s=cur;$('#show').disabled=true;
+ const full=$('#view').value==='full';
+ session.items.push({t:new Date().toISOString(),id:s.id,organ:s.organ,dx:s.diagnosis,myOrgan:$('#organ').value.trim(),myDx:$('#dx').value.trim(),grade:'',view:full?'整張':'三格',cells:full?'全部':picks.map(c=>`r${c.r+1}c${c.c+1}`).join(' ')});session.exported=false;saveSession();
+ const item=session.items[session.items.length-1];
+ revealed=true;if(!full)$('#whole').hidden=false;
  const mine=($('#organ').value||$('#dx').value)?`<div class="mine">你的答案：${esc($('#organ').value)||'—'} ／ ${esc($('#dx').value)||'—'}</div>`:'';
  $('#reveal').innerHTML=`<div><p class="note">${esc(s.id)} · ${s.date.slice(0,2)}/${s.date.slice(2)} ${esc(s.lesson)}</p><h3>${esc(s.organ)} · ${esc(s.diagnosis)}</h3><p class="zh">${esc(s.zh)}</p>${mine}<strong>Description（講義答案頁）</strong><ol>${s.pairs.map(p=>`<li>${esc(p)}</li>`).join('')}</ol>${s.extra.length?`<p class="extra">補充：${s.extra.map(esc).join('；')}</p>`:''}<p><a href="${GUIDE+s.id}" target="_blank" rel="noopener">到切片導讀看這一片 →</a></p>
  <div class="grade"><button class="ok" id="g-ok">我答對了</button><button class="bad" id="g-bad">答錯／不確定</button><button class="primary" id="g-next">下一題 →</button></div></div>
 `;
  $('#reveal').className='reveal show';
- const grade=k=>{rec[s.id]=rec[s.id]||{};rec[s.id][k]=(rec[s.id][k]||0)+1;put('rec',rec);stats();next()};
+ const grade=k=>{item.grade=k==='ok'?'對':'錯';saveSession();rec[s.id]=rec[s.id]||{};rec[s.id][k]=(rec[s.id][k]||0)+1;put('rec',rec);stats();next()};
  $('#g-ok').onclick=()=>grade('ok');$('#g-bad').onclick=()=>grade('bad');$('#g-next').onclick=next;$('#reveal').scrollIntoView({behavior:'smooth',block:'start'})};
-stats();next();
+function fmt(t){const d=new Date(t);return d.toLocaleString('zh-TW',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}
+function summary(){const it=session.items,ok=it.filter(x=>x.grade==='對').length,bad=it.filter(x=>x.grade==='錯').length;return {n:it.length,ok,bad,none:it.length-ok-bad}}
+function showLog(){const m=summary(),it=session.items;
+ $('#log-body').innerHTML=`<p class="sum">本輪開始於 ${fmt(session.start)} · 共 ${m.n} 題：<span class="g-ok">對 ${m.ok}</span> / <span class="g-bad">錯 ${m.bad}</span> / 未評 ${m.none}${session.exported?'（已匯出）':''}</p>`+(it.length?`<table><thead><tr><th>#</th><th>時間</th><th>玻片</th><th>正確答案</th><th>我的答案</th><th>自評</th><th>模式</th></tr></thead><tbody>${it.map((x,i)=>`<tr><td>${i+1}</td><td>${fmt(x.t)}</td><td>${esc(x.id)}</td><td>${esc(x.organ)} · ${esc(x.dx)}</td><td>${esc(x.myOrgan||'—')} · ${esc(x.myDx||'—')}</td><td class="${x.grade==='對'?'g-ok':x.grade==='錯'?'g-bad':''}">${x.grade||'未評'}</td><td>${x.view} ${esc(x.cells)}</td></tr>`).join('')}</tbody></table>`:'<p class="note">這一輪還沒有作答紀錄。按「看答案」後就會記下來。</p>');
+ $('#log-msg').textContent='';$('#logbox').showModal()}
+function csv(){const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;const head=['#','時間','玻片','正確器官','正確診斷','我的器官','我的診斷','自評','模式','格子'];
+ return '\ufeff'+[head,...session.items.map((x,i)=>[i+1,fmt(x.t),x.id,x.organ,x.dx,x.myOrgan,x.myDx,x.grade||'未評',x.view,x.cells])].map(r=>r.map(q).join(',')).join('\r\n')}
+function text(){const m=summary();return `切片刷題 本輪紀錄（${fmt(session.start)} 起，共 ${m.n} 題：對 ${m.ok}／錯 ${m.bad}／未評 ${m.none}）\n`+session.items.map((x,i)=>`${i+1}. ${x.id} 正解 ${x.organ} · ${x.dx}｜我答 ${x.myOrgan||'—'} · ${x.myDx||'—'}｜${x.grade||'未評'}`).join('\n')}
+$('#log-btn').onclick=showLog;$('#log-close').onclick=()=>$('#logbox').close();
+$('#log-csv').onclick=()=>{if(!session.items.length)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv()],{type:'text/csv;charset=utf-8'}));const d=new Date(session.start);a.download=`切片刷題_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);session.exported=true;saveSession();showLog();$('#log-msg').textContent='已下載。'};
+$('#log-copy').onclick=async()=>{if(!session.items.length)return;try{await navigator.clipboard.writeText(text());session.exported=true;saveSession();showLog();$('#log-msg').textContent='已複製，可貼到筆記。'}catch{$('#log-msg').textContent='無法存取剪貼簿，請改用下載 CSV。'}};
+$('#log-new').onclick=()=>{if(session.items.length&&!session.exported&&!confirm('這一輪還沒匯出，確定要清掉並開始新一輪嗎？'))return;session={start:new Date().toISOString(),items:[],exported:true};saveSession();showLog()};
+// 有未匯出的紀錄時，關閉或重新整理前提醒（瀏覽器只會顯示它自己的提示文字）
+window.addEventListener('beforeunload',e=>{if(session.items.length&&!session.exported){e.preventDefault();e.returnValue=''}});
+saveSession();stats();next();
 </script>
 </body>
 </html>
