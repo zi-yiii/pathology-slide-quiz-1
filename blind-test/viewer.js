@@ -96,17 +96,24 @@ window.Detail20x = (() => {
   for (const [id, dx, dy] of [['detail-left',-.5,0],['detail-right',.5,0],['detail-up',0,-.5],['detail-down',0,.5]]) {
     $(id).onclick = () => { x += dx*W; y += dy*H; render(); };
   }
+  const keyMoves={ArrowLeft:[-.5,0],ArrowRight:[.5,0],ArrowUp:[0,-.5],ArrowDown:[0,.5]};
+  dialog.addEventListener('keydown',e=>{if(!dialog.open||e.altKey||e.ctrlKey||e.metaKey||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const delta=keyMoves[e.key];if(!delta)return;e.preventDefault();x+=delta[0]*W;y+=delta[1]*H;render()});
+  let swipe=null;
+  $('detail-canvas').style.touchAction='none';
+  $('detail-canvas').addEventListener('pointerdown',e=>{swipe={id:e.pointerId,x:e.clientX,y:e.clientY};e.currentTarget.setPointerCapture(e.pointerId)});
+  $('detail-canvas').addEventListener('pointerup',e=>{if(!swipe||swipe.id!==e.pointerId)return;const r=e.currentTarget.getBoundingClientRect();x-=(e.clientX-swipe.x)*W/r.width;y-=(e.clientY-swipe.y)*H/r.height;swipe=null;render()});
+  $('detail-canvas').addEventListener('pointercancel',()=>swipe=null);
   $('detail-retry').onclick = render;
   $('detail-close').onclick = () => dialog.close();
   dialog.addEventListener('close', () => { ++generation; abort?.abort(); });
   return {
     available,
-    open(s, c=null) {
+    open(s, c=null, fx=.5, fy=.5) {
       if (!available(s)) return;
       slide=s; cell=c; tileSet=new Set(s.selectable20x?.tiles || []);
       const g=geometry();
-      x=c ? (c.highBounds?.x ?? c.c*g.width/s.cols) + .5*(c.highBounds?.width ?? g.width/s.cols) : .5*g.width;
-      y=c ? (c.highBounds?.y ?? c.r*g.height/s.rows) + .5*(c.highBounds?.height ?? g.height/s.rows) : .5*g.height;
+      x=c ? (c.highBounds?.x ?? c.c*g.width/s.cols) + fx*(c.highBounds?.width ?? g.width/s.cols) : fx*g.width;
+      y=c ? (c.highBounds?.y ?? c.r*g.height/s.rows) + fy*(c.highBounds?.height ?? g.height/s.rows) : fy*g.height;
       $('detail-map').src=c ? `slides/${s.id}/r${c.r}c${c.c}.jpg` : `slides/${s.id}/overview.jpg`;
       $('detail-map').alt=c ? '點選此區域的任意位置' : '點選整張玻片的任意位置';
       dialog.showModal(); render();

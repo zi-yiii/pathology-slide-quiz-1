@@ -88,4 +88,7 @@ dialog::backdrop{background:#16121bdd}
  .answer-box{grid-template-columns:1fr}
  main{padding:14px 16px 50px}
 }
-</style><body><main><h1>匿名切片測試</h1><p>整張先看器官與病灶分布，再自由點選查看細節。所有位置使用相同解析度，不提供額外高解析度入口。</p><button id="browse">整張自由瀏覽</button><p>先自行判斷器官、病變與依據，再回聊天告訴我；這頁不顯示答案。</p><img src="slides/case01/overview.jpg" alt="匿名切片整張全景" style="max-width:100%;max-height:70vh;cursor:crosshair" id="overview"></main><script src="data.js"></script><script src="viewer.js"></script><script>document.getElementById('browse').onclick=()=>Detail20x.open(BLIND_CASE);document.getElementById('overview').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();Detail20x.open(BLIND_CASE,null,(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height)};</script></body></html>
+
+.detail-nav button,#detail-close{min-width:44px;min-height:44px}#detailbox{max-height:92dvh;overflow:auto}.detail-map img{user-select:none;-webkit-user-drag:none}.detail-high{min-width:0}
+@media(max-width:1024px) and (orientation:portrait){.detail-grid{grid-template-columns:1fr}.detail-low{width:min(100%,440px);margin:auto}}
+</style><body><main><h1>匿名切片測試</h1><p>整張先看器官與病灶分布，再自由點選查看細節。所有位置使用相同解析度，不提供額外高解析度入口。</p><button id="browse">整張自由瀏覽</button><p>先自行判斷器官、病變與依據，再回聊天告訴我；這頁不顯示答案。</p><img src="slides/case01/overview.jpg" alt="匿名切片整張全景" style="max-width:100%;max-height:70vh;cursor:crosshair" id="overview"></main><script src="data.js"></script><script src="viewer.js?v=controls1"></script><script>document.getElementById('browse').onclick=()=>Detail20x.open(BLIND_CASE);document.getElementById('overview').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();Detail20x.open(BLIND_CASE,null,(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height)};</script></body></html>
