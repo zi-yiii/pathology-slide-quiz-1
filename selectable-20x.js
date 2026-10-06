@@ -13,6 +13,7 @@ window.Detail20x = (() => {
   let slide, cell, x, y, generation = 0, abort, tileSet;
   let W = 1280, H = 1280, fieldMode = 10;
   const images = new Map();
+  const cacheLimit = matchMedia("(pointer: coarse)").matches ? 48 : 100;
   const service = () => String(window.PATHOLOGY_IMAGE_SERVICE || '').replace(/\/$/, '');
   const available = s => !!(s?.selectable20x || (s?.highResolution && service()));
   const geometry = () => slide.selectable20x || slide.highResolution;
@@ -25,7 +26,7 @@ window.Detail20x = (() => {
       const blob = await r.blob();
       const image = await createImageBitmap(blob);
       images.set(url, image);
-      if (images.size > 100) {
+      if (images.size > cacheLimit) {
         const first = images.keys().next().value;
         images.get(first).close(); images.delete(first);
       }

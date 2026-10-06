@@ -98,6 +98,7 @@ dialog::backdrop{background:#16121bdd}
 .detail-nav button,#detail-close{min-width:44px;min-height:44px}#detailbox{max-height:92dvh;overflow:auto}.detail-map img{user-select:none;-webkit-user-drag:none}.detail-high{min-width:0}
 @media(max-width:1024px) and (orientation:portrait){.detail-grid{grid-template-columns:1fr}.detail-low{width:min(100%,440px);margin:auto}}
 
+.detail-nav button[aria-pressed=true]{background:var(--purple);color:#fff;border-color:var(--purple)}
 #detail-marker{border-radius:50%}#detail-canvas{width:min(100%,65vh);margin:auto;cursor:grab}.detail-high .detail-nav{justify-content:center}
 </style>
 </head>
@@ -107,14 +108,15 @@ dialog::backdrop{background:#16121bdd}
  <div class="controls">
   <select id="scope" aria-label="出題範圍"><option value="">全部講次</option></select>
   <select id="view" aria-label="顯示方式"><option value="full">整片模式</option><option value="three">三格模式</option></select>
-  <select id="mode" aria-label="出題方式"><option value="random">隨機</option><option value="wrong">只出答錯過的</option></select>
+  <select id="mode" aria-label="出題方式"><option value="random">隨機・一輪不重複</option><option value="wrong">錯題重跑</option></select>
   <button id="free-whole" type="button" hidden>整張圓形視野瀏覽</button>
+  <button id="clear-wrong" type="button">清空錯題</button>
   <button id="log-btn" type="button">本輪紀錄 0</button>
   <span class="stats" id="stats"></span>
  </div>
 </header>
 <main>
- <p class="note" id="coverage-note">35 個案例已收錄。整張自由瀏覽圖片正在分批補齊；目前部分案例先提供格子預覽。PA0354 使用講義視野，沒有校準倍率或整張自由選點。</p>
+ <p class="note" id="coverage-note">35 個案例已收錄；9/34 張原片已支援整張自由選點與 10×／40× 圓形視野（同一圖片解析度）。PA0354 提供講義視野，無校準倍率或整張自由選點。</p>
  <div class="qhead"><h2 id="qtitle">第 1 題</h2><p id="qhelp"></p></div>
  <figure class="whole" id="whole"></figure>
  <div class="tiles" id="tiles"></div>
@@ -137,9 +139,9 @@ dialog::backdrop{background:#16121bdd}
  <div class="body" id="log-body"></div>
  <div class="acts"><button class="primary" id="log-csv">暫停並下載 CSV</button><button id="log-copy">複製文字</button><button id="log-new">開始新一輪</button><span class="note" id="log-msg"></span></div>
 </dialog>
-<script src="quiz-data.js?v=20261006-all35a"></script>
-<script src="image-service.js?v=20261006-all35a"></script>
-<script src="selectable-20x.js?v=20261006-all35a"></script>
+<script src="quiz-data.js?v=20261006-all35-9"></script>
+<script src="image-service.js?v=20261006-all35-9"></script>
+<script src="selectable-20x.js?v=20261006-all35-9"></script>
 <script>
 'use strict';
 const Q=window.QUIZ_DATA,$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -154,19 +156,31 @@ const ZOOMS=[1,1.5,2,3,4],HELP={three:['只看同一張玻片隨機的三格作�
 const lessons=[...new Map(Q.map(s=>[s.date,s.lesson])).entries()];
 lessons.forEach(([d,l])=>$('#scope').add(new Option(`${d.slice(0,2)}/${d.slice(2)} · ${l}`,d)));
 $('#scope').value=new URLSearchParams(location.search).get('scope')||get('scope','');if($('#scope').selectedIndex<0)$('#scope').value='';$('#scope').onchange=()=>{requestedSlide=null;put('scope',$('#scope').value);next()};$('#mode').onchange=next;if(get('viewVersion','')!=='circle-full-1'){put('view','full');put('viewVersion','circle-full-1')}$('#view').value=get('view','full');$('#view').onchange=()=>{put('view',$('#view').value);render()};
-function pool(){let p=Q.filter(s=>!$('#scope').value||s.date===$('#scope').value);if(requestedSlide){const selected=p.filter(s=>s.id===requestedSlide);if(selected.length)p=selected;}if($('#mode').value==='wrong'){const w=p.filter(s=>(rec[s.id]?.bad||0)>0);p=w}return p}
+function pool(){let p=Q.filter(s=>!$('#scope').value||s.date===$('#scope').value);if(requestedSlide){const selected=p.filter(s=>s.id===requestedSlide);if(selected.length)p=selected;}if($('#mode').value==='wrong'){const w=p.filter(s=>rec[s.id]?.pending??((rec[s.id]?.bad||0)>0));p=w}return p}
 function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
-function stats(){let ok=0,bad=0;Object.values(rec).forEach(r=>{ok+=r.ok||0;bad+=r.bad||0});$('#stats').textContent=`累計 ${ok} 對 / ${bad} 錯 · ${Q.length} 張玻片`}
+function stats(){let ok=0,bad=0;Object.values(rec).forEach(r=>{ok+=r.ok||0;bad+=r.bad||0});$('#stats').textContent=`累計 ${ok} 對 / ${bad} 錯 · ${Q.length} 張玻片`;$('#clear-wrong').disabled=!Q.some(s=>rec[s.id]?.pending??((rec[s.id]?.bad||0)>0))}
 function base(s){return s.assetBase||`slides/${s.id}`}
 function src(s,c,hi){return `${base(s)}/r${c.r}c${c.c}.jpg`}
-function next(){const p=pool();if(!p.length){cur=null;$('#free-whole').hidden=true;$('#qtitle').textContent=$('#mode').value==='wrong'?'這個範圍沒有錯題':'這個範圍沒有題目';$('#qhelp').textContent='請切換講次或出題方式。';$('#tiles').innerHTML='';$('#whole').hidden=$('#full').hidden=true;$('#reveal').className='reveal';$('#show').disabled=true;return}let s;do{s=p[Math.floor(Math.random()*p.length)]}while(p.length>1&&cur&&s.id===cur.id);cur=s;n++;
+function drawSlide(p){
+ const key=[$('#scope').value||'all',$('#mode').value,requestedSlide||''].join('|'), allowed=new Set(p.map(s=>s.id));
+ let decks=get('decks',{});if(!decks||typeof decks!=='object'||Array.isArray(decks))decks={};
+ let d=decks[key];if(!d||!Array.isArray(d.seen)||!Array.isArray(d.left))d={seen:[],left:[],round:1};
+ d.seen=[...new Set(d.seen.filter(id=>typeof id==='string'))];d.left=[...new Set(d.left.filter(id=>allowed.has(id)&&!d.seen.includes(id)))];
+ d.left.push(...shuffle(p.map(s=>s.id).filter(id=>!d.seen.includes(id)&&!d.left.includes(id))));
+ if(!d.left.length){d={seen:[],left:shuffle(p.map(s=>s.id)),round:(Number(d.round)||1)+1};if(d.left.length>1&&d.left[0]===cur?.id)[d.left[0],d.left[1]]=[d.left[1],d.left[0]];}
+ const id=d.left.shift();d.seen.push(id);decks[key]=d;put('decks',decks);
+ return {slide:p.find(s=>s.id===id),round:d.round,index:d.seen.filter(id=>allowed.has(id)).length,total:p.length};
+}
+function next(){const p=pool();if(!p.length){cur=null;$('#free-whole').hidden=true;$('#qtitle').textContent=$('#mode').value==='wrong'?'這個範圍沒有錯題':'這個範圍沒有題目';$('#qhelp').textContent='請切換講次或出題方式。';$('#tiles').innerHTML='';$('#whole').hidden=$('#full').hidden=true;$('#reveal').className='reveal';$('#show').disabled=true;return}const draw=drawSlide(p),s=draw.slide;cur=s;n++;
  picks=shuffle(s.cells).slice(0,3);zoom=1;revealed=false;
- $('#qtitle').textContent=`第 ${n} 題`;
+ $('#qtitle').textContent=`第 ${draw.round} 輪 · ${draw.index} / ${draw.total}`;
  $('#organ').value='';$('#dx').value='';$('#reveal').className='reveal';$('#reveal').innerHTML='';$('#show').disabled=false;$('#organ').focus({preventScroll:true});window.scrollTo({top:0});
  render()}
 $('#free-whole').onclick=()=>Detail20x.open(cur);
+$('#clear-wrong').onclick=()=>{if(!confirm('清空全部待重跑錯題？歷史作答紀錄與對錯統計會保留。'))return;for(const r of Object.values(rec))r.pending=false;put('rec',rec);const decks=get('decks',{});for(const key of Object.keys(decks))if(key.split('|')[1]==='wrong')delete decks[key];put('decks',decks);stats();if($('#mode').value==='wrong')next();};
+
 function render(){if(!cur)return;$('#free-whole').hidden=!Detail20x.available(cur);const s=cur,G=s.cols,H=s.rows,full=$('#view').value==='full';
- if(full||s.lectureOnly){$('#whole').hidden=false;$('#tiles').hidden=$('#full').hidden=true;$('#qhelp').textContent=s.lectureOnly?'此案例提供講義視野；沒有校準倍率或可確認的線上原片。':'點整張低倍圖選位置，以圓形視野查看細節，再作答。';$('#qnote').textContent='';$('#whole').innerHTML=s.lectureOnly?`<div class="tiles">${s.cells.map((c,i)=>`<button class="tile" data-i="${i}"><img src="${src(s,c)}" alt="講義視野 ${i+1}"><span>講義視野 ${i+1}</span></button>`).join('')}</div>`:`<div class="map" id="browse-map"><img src="${base(s)}/overview.jpg" alt="整張玻片低倍全景"></div><figcaption>點選位置看細節；方向鍵或拖曳圓形視野移動。</figcaption>`;if(s.lectureOnly){document.querySelectorAll('#whole .tile').forEach(b=>b.onclick=()=>open(s.cells[Number(b.dataset.i)],'講義視野'));}else{$('#browse-map').onclick=e=>{if(Detail20x.available(s)){const r=$('#browse-map img').getBoundingClientRect();Detail20x.open(s,null,(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height)}else{open(s.cells[0],'格子預覽')}}}return;}
+ if(full||s.lectureOnly){$('#whole').hidden=false;$('#tiles').hidden=$('#full').hidden=true;$('#qhelp').textContent=s.lectureOnly?'此案例提供講義視野；沒有校準倍率或可確認的線上原片。':Detail20x.available(s)?'圓形視野已開放：點低倍圖選位置，切換 10×／40× 查看細節。':'本片完整細節圖尚在上架，目前提供低倍全景與格子預覽。';$('#qnote').textContent='';$('#whole').innerHTML=s.lectureOnly?`<div class="tiles">${s.cells.map((c,i)=>`<button class="tile" data-i="${i}"><img src="${src(s,c)}" alt="講義視野 ${i+1}"><span>講義視野 ${i+1}</span></button>`).join('')}</div>`:`<div class="map" id="browse-map"><img src="${base(s)}/overview.jpg" alt="整張玻片低倍全景"></div><figcaption>${Detail20x.available(s)?'點選位置看圓形視野；方向鍵或拖曳右圖移動。':'圓形視野尚未開放；點圖可先看格子預覽。'}</figcaption>`;if(s.lectureOnly){document.querySelectorAll('#whole .tile').forEach(b=>b.onclick=()=>open(s.cells[Number(b.dataset.i)],'講義視野'));}else{$('#browse-map').onclick=e=>{if(Detail20x.available(s)){const r=$('#browse-map img').getBoundingClientRect();Detail20x.open(s,null,(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height)}else{open(s.cells[0],'格子預覽')}}}return;}
  [$('#qhelp').textContent,$('#qnote').textContent]=HELP[full?'full':'three'];
  $('#whole').hidden=full||!revealed;$('#tiles').hidden=full;$('#full').hidden=!full;
  $('#whole').innerHTML=`<div class="map" id="wmap"><img src="${base(s)}/overview.jpg" alt="整張玻片低倍全景">${picks.map((c,i)=>`<div class="box" style="left:${c.c/G*100}%;top:${c.r/H*100}%;width:${100/G}%;height:${100/H}%"><b>${'ABC'[i]}</b></div>`).join('')}</div><figcaption>答案揭曉：整張玻片低倍全景，黃框是本題三格的位置（點圖放大）</figcaption>`;
@@ -196,7 +210,7 @@ $('#form').onsubmit=e=>{e.preventDefault();const s=cur;$('#show').disabled=true;
  <div class="grade"><button class="ok" id="g-ok">我答對了</button><button class="bad" id="g-bad">答錯／不確定</button><button class="primary" id="g-next">下一題 →</button></div></div>
 `;
  $('#reveal').className='reveal show';
- const grade=k=>{item.grade=k==='ok'?'對':'錯';saveSession();rec[s.id]=rec[s.id]||{};rec[s.id][k]=(rec[s.id][k]||0)+1;put('rec',rec);stats();next()};
+ const grade=k=>{item.grade=k==='ok'?'對':'錯';saveSession();rec[s.id]=rec[s.id]||{};rec[s.id][k]=(rec[s.id][k]||0)+1;rec[s.id].pending=k==='bad';put('rec',rec);stats();next()};
  $('#g-ok').onclick=()=>grade('ok');$('#g-bad').onclick=()=>grade('bad');$('#g-next').onclick=next;$('#reveal').scrollIntoView({behavior:'smooth',block:'start'})};
 function fmt(t){const d=new Date(t);return d.toLocaleString('zh-TW',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}
 function summary(){const it=session.items,ok=it.filter(x=>x.grade==='對').length,bad=it.filter(x=>x.grade==='錯').length;return {n:it.length,ok,bad,none:it.length-ok-bad}}
@@ -209,7 +223,7 @@ function text(){const m=summary();return `切片刷題 本輪紀錄（${fmt(sess
 $('#log-btn').onclick=showLog;$('#log-close').onclick=()=>$('#logbox').close();
 $('#log-csv').onclick=()=>{if(!session.items.length)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv()],{type:'text/csv;charset=utf-8'}));const d=new Date(session.start);a.download=`切片刷題_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);session.exported=true;saveSession();showLog();$('#log-msg').textContent='已下載。'};
 $('#log-copy').onclick=async()=>{if(!session.items.length)return;try{await navigator.clipboard.writeText(text());session.exported=true;saveSession();showLog();$('#log-msg').textContent='已複製，可貼到筆記。'}catch{$('#log-msg').textContent='無法存取剪貼簿，請改用下載 CSV。'}};
-$('#log-new').onclick=()=>{if(session.items.length&&!session.exported&&!confirm('這一輪還沒匯出，確定要清掉並開始新一輪嗎？'))return;session={start:new Date().toISOString(),items:[],exported:true};saveSession();showLog()};
+$('#log-new').onclick=()=>{if(session.items.length&&!session.exported&&!confirm('這一輪還沒匯出，確定要清掉並開始新一輪嗎？'))return;session={start:new Date().toISOString(),items:[],exported:true};put('decks',{});saveSession();next();showLog()};
 // 有未匯出的紀錄時，關閉或重新整理前提醒（瀏覽器只會顯示它自己的提示文字）
 window.addEventListener('beforeunload',e=>{if(session.items.length&&!session.exported){e.preventDefault();e.returnValue=''}});
 saveSession();stats();next();
