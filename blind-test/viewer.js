@@ -12,15 +12,16 @@ window.Detail20x = (() => {
   document.body.appendChild(dialog);
   let slide, cell, x, y, generation = 0, abort, tileSet;
   let W = 1280, H = 1280, fieldMode = 10;
-  const images = new Map();
+  const images = new Map(), pending = new Map();
   const cacheLimit = matchMedia("(pointer: coarse)").matches ? 48 : 100;
   const service = () => String(window.PATHOLOGY_IMAGE_SERVICE || '').replace(/\/$/, '');
   const available = s => !!(s?.selectable20x || (s?.highResolution && service()));
   const geometry = () => slide.selectable20x || slide.highResolution;
 
   function loadImage(url, signal) {
-    if (images.has(url)) return Promise.resolve(images.get(url));
-    return fetch(url, {signal}).then(async r => {
+    if (images.has(url)) { const im=images.get(url); images.delete(url);images.set(url,im);return Promise.resolve(im); }
+    if(pending.has(url))return pending.get(url);
+    const request=fetch(url).then(async r => {
       if (r.status === 204) return null;
       if (!r.ok) throw new Error('影像暫時無法載入');
       const blob = await r.blob();
@@ -35,7 +36,8 @@ window.Detail20x = (() => {
         images.get(first).close?.(); images.delete(first);
       }
       return image;
-    });
+    }).finally(()=>pending.delete(url));
+    pending.set(url,request);return request;
   }
 
   function updateMarker() {
@@ -56,10 +58,17 @@ window.Detail20x = (() => {
     x = Math.max(0, Math.min(g.width, x)); y = Math.max(0, Math.min(g.height, y));
     updateMarker();
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
-    $('detail-status').textContent = '載入所選位置…';
+    // 先畫同位置低倍圖，細節圖到達後逐塊替換，避免空白格。
+    const preview=$('detail-map');
+    if(preview.complete&&preview.naturalWidth){
+      const bx=cell?(cell.highBounds?.x??cell.c*g.width/slide.cols):0,by=cell?(cell.highBounds?.y??cell.r*g.height/slide.rows):0;
+      const bw=cell?(cell.highBounds?.width??g.width/slide.cols):g.width,bh=cell?(cell.highBounds?.height??g.height/slide.rows):g.height;
+      ctx.drawImage(preview,bx-x+W/2,by-y+H/2,bw,bh);
+    }
+    $('detail-status').textContent = '低倍預覽 · 細節載入中…';
     const left = Math.round(x - W / 2), top = Math.round(y - H / 2);
     const ox = g.offsetX || 0, oy = g.offsetY || 0, ts = g.tileSize;
-    const tasks = [];
+    const tasks = [], visible=[];
     for (let r = Math.floor((top+oy)/ts); r <= Math.floor((top+H-1+oy)/ts); r++) {
       for (let c = Math.floor((left+ox)/ts); c <= Math.floor((left+W-1+ox)/ts); c++) {
         if (r < 0 || c < 0 || r*ts-oy >= g.height || c*ts-ox >= g.width) continue;
@@ -68,6 +77,7 @@ window.Detail20x = (() => {
         const nx=Math.max(c*ts-ox,Math.min(x,(c+1)*ts-ox)), ny=Math.max(r*ts-oy,Math.min(y,(r+1)*ts-oy));
         if((nx-x)**2+(ny-y)**2>(W/2)**2)continue;
         const url = slide.selectable20x ? `${slide.hiBase || `slides/${slide.id}/hi`}/r${r}c${c}.jpg` : `${service()}/tile/${slide.id}/${r}/${c}`;
+        visible.push({r,c,url});
         tasks.push(async () => {
           const image = await loadImage(url, abort.signal);
           if (current === generation && image) ctx.drawImage(image, c*ts-ox-left, r*ts-oy-top);
@@ -81,6 +91,12 @@ window.Detail20x = (() => {
       await Promise.all(Array.from({length: Math.min(6, tasks.length)}, worker));
       if (current !== generation) return;
       $('detail-status').textContent = `${fieldMode}× 視野 · 圓形直徑 ${(W*g.mpp/1000).toFixed(2)} mm · 同一圖片解析度`;
+      if(slide.selectable20x){
+        const near=new Set();
+        for(const t of visible)for(const [dr,dc] of [[0,1],[1,0],[0,-1],[-1,0]]){const r=t.r+dr,c=t.c+dc,u=`${slide.hiBase||`slides/${slide.id}/hi`}/r${r}c${c}.jpg`;if(tileSet.has(`${r},${c}`)&&!images.has(u)&&!pending.has(u)&&!visible.some(v=>v.url===u))near.add(u);}
+        const urls=[...near].slice(0,4);
+        (async()=>{for(const u of urls){if(current!==generation||!dialog.open)break;try{await loadImage(u)}catch{}}})();
+      }
       // 白色比例尺底避免遮住切片細節；只依原始掃描的像素尺寸繪製。
       const length = 100 / g.mpp; const sx=(W-length)/2, sy=H*.84; const font=Math.max(16,Math.round(14*W/Math.max(1,canvas.clientWidth)));
       ctx.fillStyle = '#ffffffdb'; ctx.fillRect(sx-10, sy-font-10, length+20, font+22);
@@ -89,8 +105,7 @@ window.Detail20x = (() => {
     } catch (error) {
       if (current !== generation || error.name === 'AbortError') return;
       ++generation; abort.abort();
-      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
-      $('detail-status').textContent = '影像載入失敗，請按「重新載入」。未載入的影像不會當成正常白底。';
+      $('detail-status').textContent = '部分細節載入失敗，請按「重新載入」；低倍預覽不能代表細節已完成。';
     }
   }
 
