@@ -59,6 +59,9 @@ window.Detail20x = (() => {
       for (let c = Math.floor((left+ox)/ts); c <= Math.floor((left+W-1+ox)/ts); c++) {
         if (r < 0 || c < 0 || r*ts-oy >= g.height || c*ts-ox >= g.width) continue;
         if (slide.selectable20x && !tileSet.has(`${r},${c}`)) continue;
+        // 圓形外的角落分塊不會顯示，略過這些請求。
+        const nx=Math.max(c*ts-ox,Math.min(x,(c+1)*ts-ox)), ny=Math.max(r*ts-oy,Math.min(y,(r+1)*ts-oy));
+        if((nx-x)**2+(ny-y)**2>(W/2)**2)continue;
         const url = slide.selectable20x ? `${slide.hiBase || `slides/${slide.id}/hi`}/r${r}c${c}.jpg` : `${service()}/tile/${slide.id}/${r}/${c}`;
         tasks.push(async () => {
           const image = await loadImage(url, abort.signal);

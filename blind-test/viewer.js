@@ -1,4 +1,4 @@
-/* 自由選點的 細節：只傳相對分塊座標；公開程式沒有學校網址或來源 GUID。 */
+/* 自由選點的 20×：只傳相對分塊座標；公開程式沒有學校網址或來源 GUID。 */
 window.Detail20x = (() => {
   const $ = id => document.getElementById(id);
   const dialog = document.createElement('dialog');
@@ -7,8 +7,8 @@ window.Detail20x = (() => {
   dialog.innerHTML = `<div class="modalbar"><strong>圓形視野瀏覽</strong><button id="detail-close">關閉 ×</button></div>
     <p class="hint">點低倍圖選位置；10×／40×依目鏡FN18模擬視野，切換不增加圖片解析度。方向鍵或拖曳右圖移動。</p>
     <div class="detail-grid"><div class="detail-low"><div class="detail-map"><img id="detail-map" alt="點選低倍圖選擇位置"><div id="detail-marker"></div></div></div>
-    <div class="detail-high"><div class="detail-nav"><button id="field-10" aria-pressed="true">10× 視野</button><button id="field-40" aria-pressed="false">40× 視野</button></div><p id="detail-status" role="status"></p><canvas id="detail-canvas" width="1280" height="960" aria-label="所選位置 細節 影像"></canvas>
-    <div class="detail-nav"><button id="detail-left" aria-label="細節 視野往左">←</button><button id="detail-up" aria-label="細節 視野往上">↑</button><button id="detail-down" aria-label="細節 視野往下">↓</button><button id="detail-right" aria-label="細節 視野往右">→</button><button id="detail-retry">重新載入</button></div></div></div>`;
+    <div class="detail-high"><div class="detail-nav"><button id="field-10" aria-pressed="true">10× 視野</button><button id="field-40" aria-pressed="false">40× 視野</button></div><p id="detail-status" role="status"></p><canvas id="detail-canvas" width="1280" height="960" aria-label="所選位置圓形視野"></canvas>
+    <div class="detail-nav"><button id="detail-left" aria-label="圓形視野往左">←</button><button id="detail-up" aria-label="圓形視野往上">↑</button><button id="detail-down" aria-label="圓形視野往下">↓</button><button id="detail-right" aria-label="圓形視野往右">→</button><button id="detail-retry">重新載入</button></div></div></div>`;
   document.body.appendChild(dialog);
   let slide, cell, x, y, generation = 0, abort, tileSet;
   let W = 1280, H = 1280, fieldMode = 10;
@@ -51,7 +51,7 @@ window.Detail20x = (() => {
     x = Math.max(0, Math.min(g.width, x)); y = Math.max(0, Math.min(g.height, y));
     updateMarker();
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
-    $('detail-status').textContent = '載入所選位置的 細節…';
+    $('detail-status').textContent = '載入所選位置…';
     const left = Math.round(x - W / 2), top = Math.round(y - H / 2);
     const ox = g.offsetX || 0, oy = g.offsetY || 0, ts = g.tileSize;
     const tasks = [];
@@ -59,6 +59,9 @@ window.Detail20x = (() => {
       for (let c = Math.floor((left+ox)/ts); c <= Math.floor((left+W-1+ox)/ts); c++) {
         if (r < 0 || c < 0 || r*ts-oy >= g.height || c*ts-ox >= g.width) continue;
         if (slide.selectable20x && !tileSet.has(`${r},${c}`)) continue;
+        // 圓形外的角落分塊不會顯示，略過這些請求。
+        const nx=Math.max(c*ts-ox,Math.min(x,(c+1)*ts-ox)), ny=Math.max(r*ts-oy,Math.min(y,(r+1)*ts-oy));
+        if((nx-x)**2+(ny-y)**2>(W/2)**2)continue;
         const url = slide.selectable20x ? `${slide.hiBase || `slides/${slide.id}/hi`}/r${r}c${c}.jpg` : `${service()}/tile/${slide.id}/${r}/${c}`;
         tasks.push(async () => {
           const image = await loadImage(url, abort.signal);
@@ -116,8 +119,9 @@ window.Detail20x = (() => {
       const g=geometry();
       x=c ? (c.highBounds?.x ?? c.c*g.width/s.cols) + fx*(c.highBounds?.width ?? g.width/s.cols) : fx*g.width;
       y=c ? (c.highBounds?.y ?? c.r*g.height/s.rows) + fy*(c.highBounds?.height ?? g.height/s.rows) : fy*g.height;
-      $('detail-map').src=c ? `slides/${s.id}/r${c.r}c${c.c}.jpg` : `slides/${s.id}/overview.jpg`;
-      $('detail-map').alt=c ? '點選此區域的任意位置' : '點選整張玻片的任意位置';
+      const base=s.assetBase||`slides/${s.id}`;
+      $('detail-map').src=c ? `${base}/r${c.r}c${c.c}.jpg` : `${base}/overview.jpg`;
+      $('detail-map').alt=c ? '點選此 3mm 格子的任意位置' : '點選整張玻片的任意位置';
       dialog.showModal(); render();
     }
   };
