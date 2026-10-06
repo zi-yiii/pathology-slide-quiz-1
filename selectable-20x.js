@@ -7,8 +7,8 @@ window.Detail20x = (() => {
   dialog.innerHTML = `<div class="modalbar"><strong>圓形視野瀏覽</strong><button id="detail-close">關閉 ×</button></div>
     <p class="hint">點低倍圖選位置；10×／40×依目鏡FN18模擬視野，切換不增加圖片解析度。方向鍵或拖曳右圖移動。</p>
     <div class="detail-grid"><div class="detail-low"><div class="detail-map"><img id="detail-map" alt="點選低倍圖選擇位置"><div id="detail-marker"></div></div></div>
-    <div class="detail-high"><div class="detail-nav"><button id="field-10" aria-pressed="true">10× 視野</button><button id="field-40" aria-pressed="false">40× 視野</button></div><p id="detail-status" role="status"></p><canvas id="detail-canvas" width="1280" height="960" aria-label="所選位置 20× 影像"></canvas>
-    <div class="detail-nav"><button id="detail-left" aria-label="20× 視野往左">←</button><button id="detail-up" aria-label="20× 視野往上">↑</button><button id="detail-down" aria-label="20× 視野往下">↓</button><button id="detail-right" aria-label="20× 視野往右">→</button><button id="detail-retry">重新載入</button></div></div></div>`;
+    <div class="detail-high"><div class="detail-nav"><button id="field-10" aria-pressed="true">10× 視野</button><button id="field-40" aria-pressed="false">40× 視野</button></div><p id="detail-status" role="status"></p><canvas id="detail-canvas" width="1280" height="960" aria-label="所選位置圓形視野"></canvas>
+    <div class="detail-nav"><button id="detail-left" aria-label="圓形視野往左">←</button><button id="detail-up" aria-label="圓形視野往上">↑</button><button id="detail-down" aria-label="圓形視野往下">↓</button><button id="detail-right" aria-label="圓形視野往右">→</button><button id="detail-retry">重新載入</button></div></div></div>`;
   document.body.appendChild(dialog);
   let slide, cell, x, y, generation = 0, abort, tileSet;
   let W = 1280, H = 1280, fieldMode = 10;
@@ -51,7 +51,7 @@ window.Detail20x = (() => {
     x = Math.max(0, Math.min(g.width, x)); y = Math.max(0, Math.min(g.height, y));
     updateMarker();
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
-    $('detail-status').textContent = '載入所選位置的 20×…';
+    $('detail-status').textContent = '載入所選位置…';
     const left = Math.round(x - W / 2), top = Math.round(y - H / 2);
     const ox = g.offsetX || 0, oy = g.offsetY || 0, ts = g.tileSize;
     const tasks = [];
@@ -116,7 +116,8 @@ window.Detail20x = (() => {
       const g=geometry();
       x=c ? (c.highBounds?.x ?? c.c*g.width/s.cols) + fx*(c.highBounds?.width ?? g.width/s.cols) : fx*g.width;
       y=c ? (c.highBounds?.y ?? c.r*g.height/s.rows) + fy*(c.highBounds?.height ?? g.height/s.rows) : fy*g.height;
-      $('detail-map').src=c ? `slides/${s.id}/r${c.r}c${c.c}.jpg` : `slides/${s.id}/overview.jpg`;
+      const base=s.assetBase||`slides/${s.id}`;
+      $('detail-map').src=c ? `${base}/r${c.r}c${c.c}.jpg` : `${base}/overview.jpg`;
       $('detail-map').alt=c ? '點選此 3mm 格子的任意位置' : '點選整張玻片的任意位置';
       dialog.showModal(); render();
     }

@@ -103,10 +103,10 @@ dialog::backdrop{background:#16121bdd}
 </head>
 <body>
 <header>
- <h1>切片刷題機<small>線上玻片 3mm 方格 · 三格模式／整張模式 · 先認器官再下診斷</small></h1>
+ <h1>切片刷題機<small>35 個案例 · 整張自由瀏覽／三格模式 · 先認器官再下診斷</small></h1>
  <div class="controls">
   <select id="scope" aria-label="出題範圍"><option value="">全部講次</option></select>
-  <select id="view" aria-label="顯示方式"><option value="three">三格模式</option><option value="full">整張模式</option></select>
+  <select id="view" aria-label="顯示方式"><option value="browse">整張自由瀏覽</option><option value="three">三格模式</option><option value="full">整張模式</option></select>
   <select id="mode" aria-label="出題方式"><option value="random">隨機</option><option value="wrong">只出答錯過的</option></select>
   <button id="free-whole" type="button" hidden>整張圓形視野瀏覽</button>
   <button id="log-btn" type="button">本輪紀錄 0</button>
@@ -114,7 +114,7 @@ dialog::backdrop{background:#16121bdd}
  </div>
 </header>
 <main>
- <p class="note">試用版：27/35 個案例。自由選點 20× 先開放 10/01 的 CMV 腎臟玻片：按上方「整張圓形視野瀏覽」，即可在整張低倍圖任選位置。其餘案例可使用既有高倍預覽。</p>
+ <p class="note" id="coverage-note">35 個案例已收錄。整張自由瀏覽圖片正在分批補齊；目前部分案例先提供格子預覽。PA0354 使用講義視野，沒有校準倍率或整張自由選點。</p>
  <div class="qhead"><h2 id="qtitle">第 1 題</h2><p id="qhelp"></p></div>
  <figure class="whole" id="whole"></figure>
  <div class="tiles" id="tiles"></div>
@@ -129,7 +129,7 @@ dialog::backdrop{background:#16121bdd}
 </main>
 <dialog id="lightbox" aria-label="放大檢視">
  <div class="modalbar"><strong id="mtitle"></strong>
-  <div class="seg"><button id="m-lo" aria-pressed="true">整格 4×</button> <button id="m-hi" aria-pressed="false">格內 20×（局部）</button> <button id="m-pick" hidden>選位置看圓形視野</button> <button id="m-close">關閉 ×</button></div></div>
+  <div class="seg"><button id="m-lo" aria-pressed="true">整格預覽</button> <button id="m-hi" aria-pressed="false">圓形視野</button> <button id="m-pick" hidden>選位置看圓形視野</button> <button id="m-close">關閉 ×</button></div></div>
  <p class="hint" id="mhint"></p><div id="viewer"><div class="stage"><img id="mimg" alt=""><div class="hibox" id="hibox" hidden><b>20× 範圍</b></div></div></div>
 </dialog>
 <dialog id="logbox" aria-label="本輪紀錄">
@@ -137,9 +137,9 @@ dialog::backdrop{background:#16121bdd}
  <div class="body" id="log-body"></div>
  <div class="acts"><button class="primary" id="log-csv">暫停並下載 CSV</button><button id="log-copy">複製文字</button><button id="log-new">開始新一輪</button><span class="note" id="log-msg"></span></div>
 </dialog>
-<script src="quiz-data.js?v=20261006-circle1"></script>
-<script src="image-service.js?v=20261006-circle1"></script>
-<script src="selectable-20x.js?v=20261006-circle1"></script>
+<script src="quiz-data.js?v=20261006-all35a"></script>
+<script src="image-service.js?v=20261006-all35a"></script>
+<script src="selectable-20x.js?v=20261006-all35a"></script>
 <script>
 'use strict';
 const Q=window.QUIZ_DATA,$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -150,14 +150,15 @@ let session=get('session',null);if(!session||!Array.isArray(session.items))sessi
 const saveSession=()=>{put('session',session);const b=$('#log-btn'),k=session.items.length;b.textContent=`本輪紀錄 ${k}${k&&!session.exported?' ・未匯出':''}`;b.classList.toggle('unsaved',k>0&&!session.exported)};
 let revealed=false,rec=get('rec',{}),n=0,cur=null,picks=[],modal=null,zoom=1;
 const ZOOMS=[1,1.5,2,3,4],HELP={three:['只看同一張玻片隨機的三格作答；整張全景要按「看答案」後才出現，避免變成認低倍輪廓。點格子放大後，可切換「整格」與「格內 20×」；20× 只拍格子裡最密的一小塊，不是整格。','有些格子可能只有正常組織，請綜合三格判斷。整張切成 3mm 正方形格，組織太少的格子不出題。'],
- full:['整張模式：把這張玻片所有可出題的格子拼回原位（約 4× 物鏡），可縮放、拖曳。點任一格可看大圖與格內 20×（局部）。','組織較少的格子以低倍全景補上，避免把未出題區域誤看成組織缺角。一題需載入二三十張圖，手機網路較慢。']};
+ full:['整張模式：把這張玻片所有可出題的格子拼回原位（約 4× 物鏡），可縮放、拖曳。點任一格可看大圖與圓形視野。','組織較少的格子以低倍全景補上，避免把未出題區域誤看成組織缺角。一題需載入二三十張圖，手機網路較慢。']};
 const lessons=[...new Map(Q.map(s=>[s.date,s.lesson])).entries()];
 lessons.forEach(([d,l])=>$('#scope').add(new Option(`${d.slice(0,2)}/${d.slice(2)} · ${l}`,d)));
-$('#scope').value=new URLSearchParams(location.search).get('scope')||get('scope','');if($('#scope').selectedIndex<0)$('#scope').value='';$('#scope').onchange=()=>{requestedSlide=null;put('scope',$('#scope').value);next()};$('#mode').onchange=next;$('#view').value=get('view','three');$('#view').onchange=()=>{put('view',$('#view').value);render()};
+$('#scope').value=new URLSearchParams(location.search).get('scope')||get('scope','');if($('#scope').selectedIndex<0)$('#scope').value='';$('#scope').onchange=()=>{requestedSlide=null;put('scope',$('#scope').value);next()};$('#mode').onchange=next;$('#view').value=get('view','browse');$('#view').onchange=()=>{put('view',$('#view').value);render()};
 function pool(){let p=Q.filter(s=>!$('#scope').value||s.date===$('#scope').value);if(requestedSlide){const selected=p.filter(s=>s.id===requestedSlide);if(selected.length)p=selected;}if($('#mode').value==='wrong'){const w=p.filter(s=>(rec[s.id]?.bad||0)>0);p=w}return p}
 function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function stats(){let ok=0,bad=0;Object.values(rec).forEach(r=>{ok+=r.ok||0;bad+=r.bad||0});$('#stats').textContent=`累計 ${ok} 對 / ${bad} 錯 · ${Q.length} 張玻片`}
-function src(s,c,hi){return `slides/${s.id}/r${c.r}c${c.c}${hi?'_20x':''}.jpg`}
+function base(s){return s.assetBase||`slides/${s.id}`}
+function src(s,c,hi){return `${base(s)}/r${c.r}c${c.c}.jpg`}
 function next(){const p=pool();if(!p.length){cur=null;$('#free-whole').hidden=true;$('#qtitle').textContent=$('#mode').value==='wrong'?'這個範圍沒有錯題':'這個範圍沒有題目';$('#qhelp').textContent='請切換講次或出題方式。';$('#tiles').innerHTML='';$('#whole').hidden=$('#full').hidden=true;$('#reveal').className='reveal';$('#show').disabled=true;return}let s;do{s=p[Math.floor(Math.random()*p.length)]}while(p.length>1&&cur&&s.id===cur.id);cur=s;n++;
  picks=shuffle(s.cells).slice(0,3);zoom=1;revealed=false;
  $('#qtitle').textContent=`第 ${n} 題`;
@@ -165,17 +166,18 @@ function next(){const p=pool();if(!p.length){cur=null;$('#free-whole').hidden=tr
  render()}
 $('#free-whole').onclick=()=>Detail20x.open(cur);
 function render(){if(!cur)return;$('#free-whole').hidden=!Detail20x.available(cur);const s=cur,G=s.cols,H=s.rows,full=$('#view').value==='full';
+ if($('#view').value==='browse'||s.lectureOnly){$('#whole').hidden=false;$('#tiles').hidden=$('#full').hidden=true;$('#qhelp').textContent=s.lectureOnly?'此案例提供講義視野；沒有校準倍率或可確認的線上原片。':'點整張低倍圖選位置，以圓形視野查看細節，再作答。';$('#qnote').textContent='';$('#whole').innerHTML=s.lectureOnly?`<div class="tiles">${s.cells.map((c,i)=>`<button class="tile" data-i="${i}"><img src="${src(s,c)}" alt="講義視野 ${i+1}"><span>講義視野 ${i+1}</span></button>`).join('')}</div>`:`<div class="map" id="browse-map"><img src="${base(s)}/overview.jpg" alt="整張玻片低倍全景"></div><figcaption>點選位置看細節；方向鍵或拖曳圓形視野移動。</figcaption>`;if(s.lectureOnly){document.querySelectorAll('#whole .tile').forEach(b=>b.onclick=()=>open(s.cells[Number(b.dataset.i)],'講義視野'));}else{$('#browse-map').onclick=e=>{if(Detail20x.available(s)){const r=$('#browse-map img').getBoundingClientRect();Detail20x.open(s,null,(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height)}else{open(s.cells[0],'格子預覽')}}}return;}
  [$('#qhelp').textContent,$('#qnote').textContent]=HELP[full?'full':'three'];
  $('#whole').hidden=full||!revealed;$('#tiles').hidden=full;$('#full').hidden=!full;
- if(full){renderFull();return}$('#whole').innerHTML=`<div class="map" id="wmap"><img src="slides/${s.id}/overview.jpg" alt="整張玻片低倍全景">${picks.map((c,i)=>`<div class="box" style="left:${c.c/G*100}%;top:${c.r/H*100}%;width:${100/G}%;height:${100/H}%"><b>${'ABC'[i]}</b></div>`).join('')}</div><figcaption>答案揭曉：整張玻片低倍全景，黃框是本題三格的位置（點圖放大）</figcaption>`;
- $('#wmap').onclick=()=>{modal=null;$('#m-pick').hidden=!Detail20x.available(cur);$('#mimg').src=`slides/${s.id}/overview.jpg`;$('#mtitle').textContent='整張玻片低倍全景';$('#m-lo').hidden=$('#m-hi').hidden=true;$('#hibox').hidden=true;$('#mhint').hidden=true;$('#lightbox').showModal()};
- $('#tiles').innerHTML=picks.map((c,i)=>`<button class="tile" data-i="${i}" aria-label="放大第 ${i+1} 格"><img src="${src(s,c)}" alt="第 ${i+1} 格"><span><b>${'ABC'[i]}</b><span>點圖放大 · 可看格內局部 20×</span></span></button>`).join('');
+ if(full){renderFull();return}$('#whole').innerHTML=`<div class="map" id="wmap"><img src="${base(s)}/overview.jpg" alt="整張玻片低倍全景">${picks.map((c,i)=>`<div class="box" style="left:${c.c/G*100}%;top:${c.r/H*100}%;width:${100/G}%;height:${100/H}%"><b>${'ABC'[i]}</b></div>`).join('')}</div><figcaption>答案揭曉：整張玻片低倍全景，黃框是本題三格的位置（點圖放大）</figcaption>`;
+ $('#wmap').onclick=()=>{modal=null;$('#m-pick').hidden=!Detail20x.available(cur);$('#mimg').src=`${base(s)}/overview.jpg`;$('#mtitle').textContent='整張玻片低倍全景';$('#m-lo').hidden=$('#m-hi').hidden=true;$('#hibox').hidden=true;$('#mhint').hidden=true;$('#lightbox').showModal()};
+ $('#tiles').innerHTML=picks.map((c,i)=>`<button class="tile" data-i="${i}" aria-label="放大第 ${i+1} 格"><img src="${src(s,c)}" alt="第 ${i+1} 格"><span><b>${'ABC'[i]}</b><span>點圖放大 · 可看圓形視野</span></span></button>`).join('');
  document.querySelectorAll('.tile').forEach(b=>b.onclick=()=>open(picks[Number(b.dataset.i)],'ABC'[Number(b.dataset.i)]));
  // 預載 20×
  picks.forEach(c=>{const im=new Image();im.src=src(s,c,true)});
 }
 function renderFull(){const s=cur,G=s.cols,H=s.rows;
- $('#sheet').style.cssText=`width:${zoom*100}%;aspect-ratio:${G}/${H};background:white url(slides/${s.id}/overview.jpg) center/100% 100% no-repeat`;
+ $('#sheet').style.cssText=`width:${zoom*100}%;aspect-ratio:${G}/${H};background:white url(${base(s)}/overview.jpg) center/100% 100% no-repeat`;
  $('#sheet').innerHTML=s.cells.map((c,i)=>`<button class="cell" data-k="${i}" style="left:${c.c/G*100}%;top:${c.r/H*100}%;width:${100/G}%;height:${100/H}%" aria-label="第 ${c.r+1} 列第 ${c.c+1} 欄"><img loading="lazy" src="${src(s,c)}" alt=""></button>`).join('');
  document.querySelectorAll('#sheet .cell').forEach(b=>b.onclick=()=>{if(dragged)return;const c=s.cells[Number(b.dataset.k)];open(c,`第 ${c.r+1} 列第 ${c.c+1} 欄`)});
  $('#z-val').textContent=Math.round(zoom*100)+'%'}
@@ -189,19 +191,19 @@ let drag=null,dragged=false;
 $('#pan').addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')return;drag={x:e.clientX,y:e.clientY,l:$('#pan').scrollLeft,t:$('#pan').scrollTop};dragged=false});
 window.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4)dragged=true;$('#pan').scrollLeft=drag.l-dx;$('#pan').scrollTop=drag.t-dy});
 window.addEventListener('pointerup',()=>{drag=null;setTimeout(()=>dragged=false,0)});
-function open(c,label){modal={c,label};$('#m-pick').hidden=!Detail20x.available(cur);$('#m-lo').hidden=$('#m-hi').hidden=false;setHi(false);$('#lightbox').showModal()}
-function setHi(hi){modal.hi=hi;const c=modal.c,im=$('#mimg'),bx=$('#hibox');im.src=src(cur,c,hi);
- $('#mtitle').textContent=`${modal.label} · ${hi?`格內 20×（約 ${cur.hiMM[0]}×${cur.hiMM[1]} mm）`:`整格（約 ${cur.cellMM[0]}×${cur.cellMM[1]} mm）`}`;
- $('#mhint').textContent=hi?'20× 只涵蓋整格中的一小塊（整格裡黃框的位置）；其他區域請看整格圖。':(Detail20x.available(cur)?'點這張低倍圖任一位置，查看該處 20×。':'黃框是「格內 20×」拍攝的範圍，只占整格的一小部分。');$('#mhint').hidden=false;
+function open(c,label){modal={c,label};$('#m-pick').hidden=!Detail20x.available(cur);$('#m-lo').hidden=cur.lectureOnly;$('#m-hi').hidden=!Detail20x.available(cur);setHi(false);$('#lightbox').showModal()}
+function setHi(hi){if(hi&&Detail20x.available(cur)){$('#lightbox').close();Detail20x.open(cur,modal.c);return;}modal.hi=false;const c=modal.c,im=$('#mimg'),bx=$('#hibox');im.src=src(cur,c,hi);
+ $('#mtitle').textContent=cur.lectureOnly?'講義視野 · 無校準倍率':`${modal.label} · ${hi?`格內 20×（約 ${cur.hiMM[0]}×${cur.hiMM[1]} mm）`:`整格（約 ${cur.cellMM[0]}×${cur.cellMM[1]} mm）`}`;
+ $('#mhint').textContent=hi?'20× 只涵蓋整格中的一小塊（整格裡黃框的位置）；其他區域請看整格圖。':(Detail20x.available(cur)?'點這張低倍圖任一位置，查看該處圓形視野。':'黃框是「格內 20×」拍攝的範圍，只占整格的一小部分。');$('#mhint').hidden=cur.lectureOnly;
  const fx=c.hx*cur.cols-c.c,fy=c.hy*cur.rows-c.r,w=cur.hiMM[0]/cur.cellMM[0],h=cur.hiMM[1]/cur.cellMM[1];
- Object.assign(bx.style,{left:`${Math.max(0,fx-w/2)*100}%`,top:`${Math.max(0,fy-h/2)*100}%`,width:`${w*100}%`,height:`${h*100}%`});bx.hidden=hi;
+ Object.assign(bx.style,{left:`${Math.max(0,fx-w/2)*100}%`,top:`${Math.max(0,fy-h/2)*100}%`,width:`${w*100}%`,height:`${h*100}%`});bx.hidden=true;
  $('#m-lo').setAttribute('aria-pressed',!hi);$('#m-hi').setAttribute('aria-pressed',hi)}
 $('#mimg').onclick=e=>{if(!Detail20x.available(cur)||modal?.hi)return;const r=e.currentTarget.getBoundingClientRect(),fx=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),fy=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));const c=modal?.c||null;$('#lightbox').close();Detail20x.open(cur,c,fx,fy)};
 $('#m-pick').onclick=()=>{const cell=modal?.c||null;$('#lightbox').close();Detail20x.open(cur,cell)};
 $('#m-lo').onclick=()=>setHi(false);$('#m-hi').onclick=()=>setHi(true);$('#m-close').onclick=()=>$('#lightbox').close();
 $('#form').onsubmit=e=>{e.preventDefault();const s=cur;$('#show').disabled=true;
  const full=$('#view').value==='full';
- session.items.push({t:new Date().toISOString(),id:s.id,organ:s.organ,dx:s.diagnosis,myOrgan:$('#organ').value.trim(),myDx:$('#dx').value.trim(),grade:'',view:full?'整張':'三格',cells:full?'全部':picks.map(c=>`r${c.r+1}c${c.c+1}`).join(' ')});session.exported=false;saveSession();
+ session.items.push({t:new Date().toISOString(),id:s.id,organ:s.organ,dx:s.diagnosis,myOrgan:$('#organ').value.trim(),myDx:$('#dx').value.trim(),grade:'',view:s.lectureOnly?'講義視野':$('#view').value==='browse'?'自由瀏覽':full?'整張':'三格',cells:full?'全部':picks.map(c=>`r${c.r+1}c${c.c+1}`).join(' ')});session.exported=false;saveSession();
  const item=session.items[session.items.length-1];
  revealed=true;if(!full)$('#whole').hidden=false;
  const mine=($('#organ').value||$('#dx').value)?`<div class="mine">你的答案：${esc($('#organ').value)||'—'} ／ ${esc($('#dx').value)||'—'}</div>`:'';
