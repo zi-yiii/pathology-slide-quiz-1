@@ -122,11 +122,13 @@ window.Detail20x = (() => {
   }
   const keyMoves={ArrowLeft:[-.5,0],ArrowRight:[.5,0],ArrowUp:[0,-.5],ArrowDown:[0,.5]};
   dialog.addEventListener('keydown',e=>{if(!dialog.open||e.altKey||e.ctrlKey||e.metaKey||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const delta=keyMoves[e.key];if(!delta)return;e.preventDefault();x+=delta[0]*W;y+=delta[1]*H;render()});
-  let swipe=null;
+  let swipe=null, dragFrame=0;
+  const dragPreview=document.createElement('canvas');
   $('detail-canvas').style.touchAction='none';
-  $('detail-canvas').addEventListener('pointerdown',e=>{swipe={id:e.pointerId,x:e.clientX,y:e.clientY};e.currentTarget.setPointerCapture(e.pointerId)});
+  $('detail-canvas').addEventListener('pointerdown',e=>{const canvas=e.currentTarget;dragPreview.width=canvas.width;dragPreview.height=canvas.height;dragPreview.getContext('2d').drawImage(canvas,0,0);swipe={id:e.pointerId,x:e.clientX,y:e.clientY,dx:0,dy:0};canvas.setPointerCapture(e.pointerId)});
+  $('detail-canvas').addEventListener('pointermove',e=>{if(!swipe||swipe.id!==e.pointerId)return;const rect=e.currentTarget.getBoundingClientRect();swipe.dx=(e.clientX-swipe.x)*W/rect.width;swipe.dy=(e.clientY-swipe.y)*H/rect.height;if(dragFrame)return;dragFrame=requestAnimationFrame(()=>{dragFrame=0;if(!swipe)return;const ctx=$('detail-canvas').getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.drawImage(dragPreview,swipe.dx,swipe.dy);$('detail-status').textContent='拖曳預覽 · 放開後載入所選位置';});});
   $('detail-canvas').addEventListener('pointerup',e=>{if(!swipe||swipe.id!==e.pointerId)return;const r=e.currentTarget.getBoundingClientRect();x-=(e.clientX-swipe.x)*W/r.width;y-=(e.clientY-swipe.y)*H/r.height;swipe=null;render()});
-  $('detail-canvas').addEventListener('pointercancel',()=>swipe=null);
+  $('detail-canvas').addEventListener('pointercancel',()=>{swipe=null;render()});
   for(const mode of [10,40])$('field-'+mode).onclick=()=>{fieldMode=mode;for(const n of [10,40])$('field-'+n).setAttribute('aria-pressed',n===mode);render()};
   $('detail-retry').onclick = render;
   $('detail-close').onclick = () => dialog.close();
