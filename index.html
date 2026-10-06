@@ -103,12 +103,13 @@ dialog::backdrop{background:#16121bdd}
   <select id="scope" aria-label="出題範圍"><option value="">全部講次</option></select>
   <select id="view" aria-label="顯示方式"><option value="three">三格模式</option><option value="full">整張模式</option></select>
   <select id="mode" aria-label="出題方式"><option value="random">隨機</option><option value="wrong">只出答錯過的</option></select>
+  <button id="free-whole" type="button" hidden>整張自由選點 20×</button>
   <button id="log-btn" type="button">本輪紀錄 0</button>
   <span class="stats" id="stats"></span>
  </div>
 </header>
 <main>
- <p class="note">試用版：27/35 個案例。自由選點 20× 先開放 10/01 的 CMV 腎臟玻片：點格子放大後按「選位置看 20×」。其餘案例可使用既有高倍預覽。</p>
+ <p class="note">試用版：27/35 個案例。自由選點 20× 先開放 10/01 的 CMV 腎臟玻片：按上方「整張自由選點 20×」，即可在整張低倍圖任選位置。其餘案例可使用既有高倍預覽。</p>
  <div class="qhead"><h2 id="qtitle">第 1 題</h2><p id="qhelp"></p></div>
  <figure class="whole" id="whole"></figure>
  <div class="tiles" id="tiles"></div>
@@ -131,9 +132,9 @@ dialog::backdrop{background:#16121bdd}
  <div class="body" id="log-body"></div>
  <div class="acts"><button class="primary" id="log-csv">暫停並下載 CSV</button><button id="log-copy">複製文字</button><button id="log-new">開始新一輪</button><span class="note" id="log-msg"></span></div>
 </dialog>
-<script src="quiz-data.js?v=20261006-trial1"></script>
-<script src="image-service.js?v=20261006-trial1"></script>
-<script src="selectable-20x.js?v=20261006-trial1"></script>
+<script src="quiz-data.js?v=20261006-trial2"></script>
+<script src="image-service.js?v=20261006-trial2"></script>
+<script src="selectable-20x.js?v=20261006-trial2"></script>
 <script>
 'use strict';
 const Q=window.QUIZ_DATA,$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -152,12 +153,13 @@ function pool(){let p=Q.filter(s=>!$('#scope').value||s.date===$('#scope').value
 function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function stats(){let ok=0,bad=0;Object.values(rec).forEach(r=>{ok+=r.ok||0;bad+=r.bad||0});$('#stats').textContent=`累計 ${ok} 對 / ${bad} 錯 · ${Q.length} 張玻片`}
 function src(s,c,hi){return `slides/${s.id}/r${c.r}c${c.c}${hi?'_20x':''}.jpg`}
-function next(){const p=pool();if(!p.length){cur=null;$('#qtitle').textContent=$('#mode').value==='wrong'?'這個範圍沒有錯題':'這個範圍沒有題目';$('#qhelp').textContent='請切換講次或出題方式。';$('#tiles').innerHTML='';$('#whole').hidden=$('#full').hidden=true;$('#reveal').className='reveal';$('#show').disabled=true;return}let s;do{s=p[Math.floor(Math.random()*p.length)]}while(p.length>1&&cur&&s.id===cur.id);cur=s;n++;
+function next(){const p=pool();if(!p.length){cur=null;$('#free-whole').hidden=true;$('#qtitle').textContent=$('#mode').value==='wrong'?'這個範圍沒有錯題':'這個範圍沒有題目';$('#qhelp').textContent='請切換講次或出題方式。';$('#tiles').innerHTML='';$('#whole').hidden=$('#full').hidden=true;$('#reveal').className='reveal';$('#show').disabled=true;return}let s;do{s=p[Math.floor(Math.random()*p.length)]}while(p.length>1&&cur&&s.id===cur.id);cur=s;n++;
  picks=shuffle(s.cells).slice(0,3);zoom=1;revealed=false;
  $('#qtitle').textContent=`第 ${n} 題`;
  $('#organ').value='';$('#dx').value='';$('#reveal').className='reveal';$('#reveal').innerHTML='';$('#show').disabled=false;$('#organ').focus({preventScroll:true});window.scrollTo({top:0});
  render()}
-function render(){if(!cur)return;const s=cur,G=s.cols,H=s.rows,full=$('#view').value==='full';
+$('#free-whole').onclick=()=>Detail20x.open(cur);
+function render(){if(!cur)return;$('#free-whole').hidden=!Detail20x.available(cur);const s=cur,G=s.cols,H=s.rows,full=$('#view').value==='full';
  [$('#qhelp').textContent,$('#qnote').textContent]=HELP[full?'full':'three'];
  $('#whole').hidden=full||!revealed;$('#tiles').hidden=full;$('#full').hidden=!full;
  if(full){renderFull();return}$('#whole').innerHTML=`<div class="map" id="wmap"><img src="slides/${s.id}/overview.jpg" alt="整張玻片低倍全景">${picks.map((c,i)=>`<div class="box" style="left:${c.c/G*100}%;top:${c.r/H*100}%;width:${100/G}%;height:${100/H}%"><b>${'ABC'[i]}</b></div>`).join('')}</div><figcaption>答案揭曉：整張玻片低倍全景，黃框是本題三格的位置（點圖放大）</figcaption>`;
@@ -183,12 +185,13 @@ $('#pan').addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')return;d
 window.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4)dragged=true;$('#pan').scrollLeft=drag.l-dx;$('#pan').scrollTop=drag.t-dy});
 window.addEventListener('pointerup',()=>{drag=null;setTimeout(()=>dragged=false,0)});
 function open(c,label){modal={c,label};$('#m-pick').hidden=!Detail20x.available(cur);$('#m-lo').hidden=$('#m-hi').hidden=false;setHi(false);$('#lightbox').showModal()}
-function setHi(hi){const c=modal.c,im=$('#mimg'),bx=$('#hibox');im.src=src(cur,c,hi);
+function setHi(hi){modal.hi=hi;const c=modal.c,im=$('#mimg'),bx=$('#hibox');im.src=src(cur,c,hi);
  $('#mtitle').textContent=`${modal.label} · ${hi?`格內 20×（約 ${cur.hiMM[0]}×${cur.hiMM[1]} mm）`:`整格（約 ${cur.cellMM[0]}×${cur.cellMM[1]} mm）`}`;
- $('#mhint').textContent=hi?'20× 只涵蓋整格中的一小塊（整格裡黃框的位置）；其他區域請看整格圖。':'黃框是「格內 20×」拍攝的範圍，只占整格的一小部分。';$('#mhint').hidden=false;
+ $('#mhint').textContent=hi?'20× 只涵蓋整格中的一小塊（整格裡黃框的位置）；其他區域請看整格圖。':(Detail20x.available(cur)?'點這張低倍圖任一位置，查看該處 20×。':'黃框是「格內 20×」拍攝的範圍，只占整格的一小部分。');$('#mhint').hidden=false;
  const fx=c.hx*cur.cols-c.c,fy=c.hy*cur.rows-c.r,w=cur.hiMM[0]/cur.cellMM[0],h=cur.hiMM[1]/cur.cellMM[1];
  Object.assign(bx.style,{left:`${Math.max(0,fx-w/2)*100}%`,top:`${Math.max(0,fy-h/2)*100}%`,width:`${w*100}%`,height:`${h*100}%`});bx.hidden=hi;
  $('#m-lo').setAttribute('aria-pressed',!hi);$('#m-hi').setAttribute('aria-pressed',hi)}
+$('#mimg').onclick=e=>{if(!Detail20x.available(cur)||modal?.hi)return;const r=e.currentTarget.getBoundingClientRect(),fx=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),fy=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));const c=modal?.c||null;$('#lightbox').close();Detail20x.open(cur,c,fx,fy)};
 $('#m-pick').onclick=()=>{const cell=modal?.c||null;$('#lightbox').close();Detail20x.open(cur,cell)};
 $('#m-lo').onclick=()=>setHi(false);$('#m-hi').onclick=()=>setHi(true);$('#m-close').onclick=()=>$('#lightbox').close();
 $('#form').onsubmit=e=>{e.preventDefault();const s=cur;$('#show').disabled=true;
