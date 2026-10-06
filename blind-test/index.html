@@ -1,0 +1,91 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>匿名切片測試</title><style>
+:root{--ink:#2c2934;--muted:#6f6a78;--line:#e2dde7;--paper:#f8f6f2;--card:#fff;--purple:#665085;--deep:#30263e;--wash:#efeaf4;--ok:#2f7a5b;--bad:#b0413e;--hl:#ffcc00}
+@media (prefers-color-scheme:dark){:root{--ink:#ece8f2;--muted:#a7a0b2;--line:#3a3442;--paper:#18151c;--card:#221e28;--purple:#b49ad6;--deep:#120f16;--wash:#2b2533;--ok:#6fc29d;--bad:#e07a76}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.65 -apple-system,BlinkMacSystemFont,'PingFang TC','Microsoft JhengHei',sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:7px 14px;touch-action:manipulation}
+button:hover{border-color:var(--purple)}
+button.primary{background:var(--purple);border-color:var(--purple);color:#fff}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid #af99c6;outline-offset:2px}
+a{color:var(--purple)}
+header{background:var(--deep);color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;letter-spacing:1px}
+header h1 small{display:block;font-size:11px;font-weight:400;color:#d8ccdf;letter-spacing:1px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.controls select,.controls button{background:transparent;color:#f5effa;border:1px solid #796c85;border-radius:7px;padding:5px 9px}
+.controls select option{color:#000}
+.stats{font-size:12px;color:#d8ccdf}
+main{max-width:1500px;margin:auto;padding:20px 20px 60px}
+.qhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.qhead h2{margin:0;font-size:18px}
+.qhead p{margin:0;color:var(--muted);font-size:13px}
+.whole{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px}
+.whole figcaption{font-size:12px;color:var(--muted);margin-top:6px}
+.whole .map{max-width:900px;margin:auto;cursor:zoom-in}
+#log-btn{background:#ffffff1a}
+#log-btn.unsaved{border-color:var(--hl);color:var(--hl)}
+#logbox{width:min(1000px,96vw)}
+#logbox .body{padding:14px 16px;overflow:auto;max-height:70vh}
+#logbox table{border-collapse:collapse;width:100%;font-size:13px}
+#logbox th,#logbox td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+#logbox .sum{margin:0 0 10px;font-size:14px}
+#logbox .acts{display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line)}
+.g-ok{color:var(--ok)}.g-bad{color:var(--bad)}
+.full{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.fullbar{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);flex-wrap:wrap}
+.fullbar button{padding:3px 10px;font-size:13px}
+.pan{overflow:auto;max-height:78vh;background:#fff}
+.sheet{position:relative;margin:auto}
+.sheet .cell{position:absolute;padding:0;border:0;border-radius:0;background:none;outline:1px solid #0000}
+.sheet .cell:hover{outline:2px solid var(--hl);z-index:1}
+.sheet .cell img{display:block;width:100%;height:100%;object-fit:fill}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;padding:0;text-align:left;display:block;width:100%}
+.tile img{display:block;width:100%;aspect-ratio:1;object-fit:contain;background:#fff}
+.tile span{display:flex;justify-content:space-between;padding:6px 10px;font-size:12px;color:var(--muted)}
+.answer-box{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin:18px 0 8px;align-items:end}
+.answer-box label{font-size:12px;color:var(--muted);display:block}
+.answer-box input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.reveal{display:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:14px}
+.reveal.show{display:block}
+.reveal h3{margin:0 0 4px;font-size:22px}
+.reveal .zh{color:var(--muted);margin:0 0 10px}
+.reveal ol{padding-left:20px;margin:6px 0}
+.reveal li{margin:4px 0}
+.reveal .extra{color:var(--muted);font-size:13px}
+.mine{font-size:13px;background:var(--wash);border-radius:8px;padding:8px 10px;margin:10px 0}
+.map{position:relative}
+.map img{width:100%;display:block;border-radius:6px}
+.map .box{position:absolute;border:3px solid var(--hl);box-shadow:0 0 0 1px #000a}
+.map .box b{position:absolute;left:2px;top:0;font-size:12px;background:var(--hl);color:#000;padding:0 4px}
+.grade{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.grade .ok{border-color:var(--ok);color:var(--ok)}
+.grade .bad{border-color:var(--bad);color:var(--bad)}
+.note{font-size:12px;color:var(--muted)}
+dialog{border:0;border-radius:12px;padding:0;width:min(1400px,96vw);max-height:94vh;background:var(--card);color:var(--ink)}
+dialog::backdrop{background:#16121bdd}
+.modalbar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.modalbar .seg button[aria-pressed=true]{background:var(--purple);color:#fff;border-color:var(--purple)}
+#viewer{overflow:auto;max-height:80vh}
+#viewer .stage{position:relative}
+#viewer .hibox{position:absolute;border:3px solid var(--hl);box-shadow:0 0 0 1px #000a;pointer-events:none}
+#viewer .hibox b{position:absolute;left:0;top:-22px;font-size:12px;background:var(--hl);color:#000;padding:0 4px;white-space:nowrap}
+.hint{font-size:12px;color:var(--muted);padding:6px 14px;margin:0;border-bottom:1px solid var(--line)}
+#viewer img{display:block;width:100%;height:auto}
+#detailbox{width:min(1500px,96vw)}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px}
+.detail-map{position:relative;background:#fff}
+.detail-map img{width:100%;display:block;cursor:crosshair}
+#detail-marker{position:absolute;border:3px solid var(--hl);pointer-events:none;box-shadow:0 0 0 1px #0008}
+#detail-canvas{display:block;width:100%;height:auto;background:#fff;border:1px solid var(--line)}
+#detail-status{margin:0 0 8px;font-size:13px;min-height:22px}
+.detail-nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+@media(max-width:760px){.detail-grid{grid-template-columns:1fr}.detail-low{max-width:440px;margin:auto}}
+@media(max-width:760px){
+ .tiles{grid-template-columns:1fr}
+ .answer-box{grid-template-columns:1fr}
+ main{padding:14px 16px 50px}
+}
+</style><body><main><h1>匿名切片測試</h1><p>整張先看器官與病灶分布，再自由點選查看細節。所有位置使用相同解析度，不提供額外高解析度入口。</p><button id="browse">整張自由瀏覽</button><p>先自行判斷器官、病變與依據，再回聊天告訴我；這頁不顯示答案。</p><img src="slides/case01/overview.jpg" alt="匿名切片整張全景" style="max-width:100%;max-height:70vh;cursor:crosshair" id="overview"></main><script src="data.js"></script><script src="viewer.js"></script><script>document.getElementById('browse').onclick=()=>Detail20x.open(BLIND_CASE);document.getElementById('overview').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();Detail20x.open(BLIND_CASE,null,(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height)};</script></body></html>
