@@ -24,11 +24,15 @@ window.Detail20x = (() => {
       if (r.status === 204) return null;
       if (!r.ok) throw new Error('影像暫時無法載入');
       const blob = await r.blob();
-      const image = await createImageBitmap(blob);
+      let image;
+      if(typeof createImageBitmap==='function'){
+        try{image=await createImageBitmap(blob)}catch{}
+      }
+      if(!image){image=await new Promise((resolve,reject)=>{const im=new Image(),url=URL.createObjectURL(blob);im.onload=()=>{URL.revokeObjectURL(url);resolve(im)};im.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('影像無法解碼'))};im.src=url;});}
       images.set(url, image);
       if (images.size > cacheLimit) {
         const first = images.keys().next().value;
-        images.get(first).close(); images.delete(first);
+        images.get(first).close?.(); images.delete(first);
       }
       return image;
     });
@@ -78,7 +82,7 @@ window.Detail20x = (() => {
       if (current !== generation) return;
       $('detail-status').textContent = `${fieldMode}× 視野 · 圓形直徑 ${(W*g.mpp/1000).toFixed(2)} mm · 同一圖片解析度`;
       // 白色比例尺底避免遮住切片細節；只依原始掃描的像素尺寸繪製。
-      const length = 100 / g.mpp; const sx=(W-length)/2, sy=H*.84; const font=Math.max(16,Math.round(W/55));
+      const length = 100 / g.mpp; const sx=(W-length)/2, sy=H*.84; const font=Math.max(16,Math.round(14*W/Math.max(1,canvas.clientWidth)));
       ctx.fillStyle = '#ffffffdb'; ctx.fillRect(sx-10, sy-font-10, length+20, font+22);
       ctx.fillStyle = '#111'; ctx.fillRect(sx, sy, length, Math.max(3,W/300));
       ctx.font = `${font}px sans-serif`; ctx.fillText('100 µm', sx, sy-6);
