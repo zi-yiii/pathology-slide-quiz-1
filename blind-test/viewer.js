@@ -3,15 +3,15 @@ window.Detail20x = (() => {
   const $ = id => document.getElementById(id);
   const dialog = document.createElement('dialog');
   dialog.id = 'detailbox';
-  dialog.setAttribute('aria-label', '選取位置看 細節');
-  dialog.innerHTML = `<div class="modalbar"><strong>選取位置看 細節</strong><button id="detail-close">關閉 ×</button></div>
-    <p class="hint">點低倍圖選位置；右側顯示該位置的 細節。白色區域可能是組織外的玻片背景。</p>
+  dialog.setAttribute('aria-label', '圓形視野瀏覽');
+  dialog.innerHTML = `<div class="modalbar"><strong>圓形視野瀏覽</strong><button id="detail-close">關閉 ×</button></div>
+    <p class="hint">點低倍圖選位置；10×／40×依目鏡FN18模擬視野，切換不增加圖片解析度。方向鍵或拖曳右圖移動。</p>
     <div class="detail-grid"><div class="detail-low"><div class="detail-map"><img id="detail-map" alt="點選低倍圖選擇位置"><div id="detail-marker"></div></div></div>
-    <div class="detail-high"><p id="detail-status" role="status"></p><canvas id="detail-canvas" width="1280" height="960" aria-label="所選位置 細節 影像"></canvas>
+    <div class="detail-high"><div class="detail-nav"><button id="field-10" aria-pressed="true">10× 視野</button><button id="field-40" aria-pressed="false">40× 視野</button></div><p id="detail-status" role="status"></p><canvas id="detail-canvas" width="1280" height="960" aria-label="所選位置 細節 影像"></canvas>
     <div class="detail-nav"><button id="detail-left" aria-label="細節 視野往左">←</button><button id="detail-up" aria-label="細節 視野往上">↑</button><button id="detail-down" aria-label="細節 視野往下">↓</button><button id="detail-right" aria-label="細節 視野往右">→</button><button id="detail-retry">重新載入</button></div></div></div>`;
   document.body.appendChild(dialog);
   let slide, cell, x, y, generation = 0, abort, tileSet;
-  const W = 1280, H = 960;
+  let W = 1280, H = 1280, fieldMode = 10;
   const images = new Map();
   const service = () => String(window.PATHOLOGY_IMAGE_SERVICE || '').replace(/\/$/, '');
   const available = s => !!(s?.selectable20x || (s?.highResolution && service()));
@@ -47,6 +47,7 @@ window.Detail20x = (() => {
   async function render() {
     abort?.abort(); abort = new AbortController();
     const current = ++generation, g = geometry(), canvas = $('detail-canvas'), ctx = canvas.getContext('2d');
+    W=H=Math.round((fieldMode===10?1800:450)/g.mpp);canvas.width=W;canvas.height=H;canvas.style.borderRadius='50%';canvas.style.aspectRatio='1';
     x = Math.max(0, Math.min(g.width, x)); y = Math.max(0, Math.min(g.height, y));
     updateMarker();
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
@@ -71,12 +72,12 @@ window.Detail20x = (() => {
     try {
       await Promise.all(Array.from({length: Math.min(6, tasks.length)}, worker));
       if (current !== generation) return;
-      $('detail-status').textContent = `細節 · 視野約 ${(W*g.mpp/1000).toFixed(2)} × ${(H*g.mpp/1000).toFixed(2)} mm`;
+      $('detail-status').textContent = `${fieldMode}× 視野 · 圓形直徑 ${(W*g.mpp/1000).toFixed(2)} mm · 同一圖片解析度`;
       // 白色比例尺底避免遮住切片細節；只依原始掃描的像素尺寸繪製。
-      const length = 100 / g.mpp;
-      ctx.fillStyle = '#ffffffdb'; ctx.fillRect(22, H-66, length+28, 48);
-      ctx.fillStyle = '#111'; ctx.fillRect(36, H-36, length, 4);
-      ctx.font = '20px sans-serif'; ctx.fillText('100 µm', 36, H-44);
+      const length = 100 / g.mpp; const sx=(W-length)/2, sy=H*.84; const font=Math.max(16,Math.round(W/55));
+      ctx.fillStyle = '#ffffffdb'; ctx.fillRect(sx-10, sy-font-10, length+20, font+22);
+      ctx.fillStyle = '#111'; ctx.fillRect(sx, sy, length, Math.max(3,W/300));
+      ctx.font = `${font}px sans-serif`; ctx.fillText('100 µm', sx, sy-6);
     } catch (error) {
       if (current !== generation || error.name === 'AbortError') return;
       ++generation; abort.abort();
@@ -103,6 +104,7 @@ window.Detail20x = (() => {
   $('detail-canvas').addEventListener('pointerdown',e=>{swipe={id:e.pointerId,x:e.clientX,y:e.clientY};e.currentTarget.setPointerCapture(e.pointerId)});
   $('detail-canvas').addEventListener('pointerup',e=>{if(!swipe||swipe.id!==e.pointerId)return;const r=e.currentTarget.getBoundingClientRect();x-=(e.clientX-swipe.x)*W/r.width;y-=(e.clientY-swipe.y)*H/r.height;swipe=null;render()});
   $('detail-canvas').addEventListener('pointercancel',()=>swipe=null);
+  for(const mode of [10,40])$('field-'+mode).onclick=()=>{fieldMode=mode;for(const n of [10,40])$('field-'+n).setAttribute('aria-pressed',n===mode);render()};
   $('detail-retry').onclick = render;
   $('detail-close').onclick = () => dialog.close();
   dialog.addEventListener('close', () => { ++generation; abort?.abort(); });

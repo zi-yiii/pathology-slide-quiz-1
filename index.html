@@ -97,6 +97,8 @@ dialog::backdrop{background:#16121bdd}
 
 .detail-nav button,#detail-close{min-width:44px;min-height:44px}#detailbox{max-height:92dvh;overflow:auto}.detail-map img{user-select:none;-webkit-user-drag:none}.detail-high{min-width:0}
 @media(max-width:1024px) and (orientation:portrait){.detail-grid{grid-template-columns:1fr}.detail-low{width:min(100%,440px);margin:auto}}
+
+#detail-marker{border-radius:50%}#detail-canvas{width:min(100%,65vh);margin:auto;cursor:grab}.detail-high .detail-nav{justify-content:center}
 </style>
 </head>
 <body>
@@ -106,13 +108,13 @@ dialog::backdrop{background:#16121bdd}
   <select id="scope" aria-label="出題範圍"><option value="">全部講次</option></select>
   <select id="view" aria-label="顯示方式"><option value="three">三格模式</option><option value="full">整張模式</option></select>
   <select id="mode" aria-label="出題方式"><option value="random">隨機</option><option value="wrong">只出答錯過的</option></select>
-  <button id="free-whole" type="button" hidden>整張自由選點 20×</button>
+  <button id="free-whole" type="button" hidden>整張圓形視野瀏覽</button>
   <button id="log-btn" type="button">本輪紀錄 0</button>
   <span class="stats" id="stats"></span>
  </div>
 </header>
 <main>
- <p class="note">試用版：27/35 個案例。自由選點 20× 先開放 10/01 的 CMV 腎臟玻片：按上方「整張自由選點 20×」，即可在整張低倍圖任選位置。其餘案例可使用既有高倍預覽。</p>
+ <p class="note">試用版：27/35 個案例。自由選點 20× 先開放 10/01 的 CMV 腎臟玻片：按上方「整張圓形視野瀏覽」，即可在整張低倍圖任選位置。其餘案例可使用既有高倍預覽。</p>
  <div class="qhead"><h2 id="qtitle">第 1 題</h2><p id="qhelp"></p></div>
  <figure class="whole" id="whole"></figure>
  <div class="tiles" id="tiles"></div>
@@ -127,7 +129,7 @@ dialog::backdrop{background:#16121bdd}
 </main>
 <dialog id="lightbox" aria-label="放大檢視">
  <div class="modalbar"><strong id="mtitle"></strong>
-  <div class="seg"><button id="m-lo" aria-pressed="true">整格 4×</button> <button id="m-hi" aria-pressed="false">格內 20×（局部）</button> <button id="m-pick" hidden>選位置看 20×</button> <button id="m-close">關閉 ×</button></div></div>
+  <div class="seg"><button id="m-lo" aria-pressed="true">整格 4×</button> <button id="m-hi" aria-pressed="false">格內 20×（局部）</button> <button id="m-pick" hidden>選位置看圓形視野</button> <button id="m-close">關閉 ×</button></div></div>
  <p class="hint" id="mhint"></p><div id="viewer"><div class="stage"><img id="mimg" alt=""><div class="hibox" id="hibox" hidden><b>20× 範圍</b></div></div></div>
 </dialog>
 <dialog id="logbox" aria-label="本輪紀錄">
@@ -135,9 +137,9 @@ dialog::backdrop{background:#16121bdd}
  <div class="body" id="log-body"></div>
  <div class="acts"><button class="primary" id="log-csv">暫停並下載 CSV</button><button id="log-copy">複製文字</button><button id="log-new">開始新一輪</button><span class="note" id="log-msg"></span></div>
 </dialog>
-<script src="quiz-data.js?v=20261006-controls1"></script>
-<script src="image-service.js?v=20261006-controls1"></script>
-<script src="selectable-20x.js?v=20261006-controls1"></script>
+<script src="quiz-data.js?v=20261006-circle1"></script>
+<script src="image-service.js?v=20261006-circle1"></script>
+<script src="selectable-20x.js?v=20261006-circle1"></script>
 <script>
 'use strict';
 const Q=window.QUIZ_DATA,$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
