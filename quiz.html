@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>切片刷題機</title>
+<style>
+:root{--ink:#2c2934;--muted:#6f6a78;--line:#e2dde7;--paper:#f8f6f2;--card:#fff;--purple:#665085;--deep:#30263e;--wash:#efeaf4;--ok:#2f7a5b;--bad:#b0413e;--hl:#ffcc00}
+@media (prefers-color-scheme:dark){:root{--ink:#ece8f2;--muted:#a7a0b2;--line:#3a3442;--paper:#18151c;--card:#221e28;--purple:#b49ad6;--deep:#120f16;--wash:#2b2533;--ok:#6fc29d;--bad:#e07a76}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.65 -apple-system,BlinkMacSystemFont,'PingFang TC','Microsoft JhengHei',sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:7px 14px;touch-action:manipulation}
+button:hover{border-color:var(--purple)}
+button.primary{background:var(--purple);border-color:var(--purple);color:#fff}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid #af99c6;outline-offset:2px}
+a{color:var(--purple)}
+header{background:var(--deep);color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;letter-spacing:1px}
+header h1 small{display:block;font-size:11px;font-weight:400;color:#d8ccdf;letter-spacing:1px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.controls select,.controls button{background:transparent;color:#f5effa;border:1px solid #796c85;border-radius:7px;padding:5px 9px}
+.controls select option{color:#000}
+.stats{font-size:12px;color:#d8ccdf}
+main{max-width:1500px;margin:auto;padding:20px 20px 60px}
+.qhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.qhead h2{margin:0;font-size:18px}
+.qhead p{margin:0;color:var(--muted);font-size:13px}
+.whole{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px}
+.whole figcaption{font-size:12px;color:var(--muted);margin-top:6px}
+.whole .map{max-width:900px;margin:auto;cursor:zoom-in}
+#log-btn{background:#ffffff1a}
+#log-btn.unsaved{border-color:var(--hl);color:var(--hl)}
+#logbox{width:min(1000px,96vw)}
+#logbox .body{padding:14px 16px;overflow:auto;max-height:70vh}
+#logbox table{border-collapse:collapse;width:100%;font-size:13px}
+#logbox th,#logbox td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+#logbox .sum{margin:0 0 10px;font-size:14px}
+#logbox .acts{display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line)}
+.g-ok{color:var(--ok)}.g-bad{color:var(--bad)}
+.full{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.fullbar{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);flex-wrap:wrap}
+.fullbar button{padding:3px 10px;font-size:13px}
+.pan{overflow:auto;max-height:78vh;background:#fff}
+.sheet{position:relative;margin:auto}
+.sheet .cell{position:absolute;padding:0;border:0;border-radius:0;background:none;outline:1px solid #0000}
+.sheet .cell:hover{outline:2px solid var(--hl);z-index:1}
+.sheet .cell img{display:block;width:100%;height:100%;object-fit:fill}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;padding:0;text-align:left;display:block;width:100%}
+.tile img{display:block;width:100%;aspect-ratio:1;object-fit:contain;background:#fff}
+.tile span{display:flex;justify-content:space-between;padding:6px 10px;font-size:12px;color:var(--muted)}
+.answer-box{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin:18px 0 8px;align-items:end}
+.answer-box label{font-size:12px;color:var(--muted);display:block}
+.answer-box input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.reveal{display:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:14px}
+.reveal.show{display:block}
+.reveal h3{margin:0 0 4px;font-size:22px}
+.reveal .zh{color:var(--muted);margin:0 0 10px}
+.reveal ol{padding-left:20px;margin:6px 0}
+.reveal li{margin:4px 0}
+.reveal .extra{color:var(--muted);font-size:13px}
+.mine{font-size:13px;background:var(--wash);border-radius:8px;padding:8px 10px;margin:10px 0}
+.map{position:relative}
+.map img{width:100%;display:block;border-radius:6px}
+.map .box{position:absolute;border:3px solid var(--hl);box-shadow:0 0 0 1px #000a}
+.map .box b{position:absolute;left:2px;top:0;font-size:12px;background:var(--hl);color:#000;padding:0 4px}
+.grade{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.grade .ok{border-color:var(--ok);color:var(--ok)}
+.grade .bad{border-color:var(--bad);color:var(--bad)}
+.note{font-size:12px;color:var(--muted)}
+dialog{border:0;border-radius:12px;padding:0;width:min(1400px,96vw);max-height:94vh;background:var(--card);color:var(--ink)}
+dialog::backdrop{background:#16121bdd}
+.modalbar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.modalbar .seg button[aria-pressed=true]{background:var(--purple);color:#fff;border-color:var(--purple)}
+#viewer{overflow:auto;max-height:80vh}
+#viewer .stage{position:relative}
+#viewer .hibox{position:absolute;border:3px solid var(--hl);box-shadow:0 0 0 1px #000a;pointer-events:none}
+#viewer .hibox b{position:absolute;left:0;top:-22px;font-size:12px;background:var(--hl);color:#000;padding:0 4px;white-space:nowrap}
+.hint{font-size:12px;color:var(--muted);padding:6px 14px;margin:0;border-bottom:1px solid var(--line)}
+#viewer img{display:block;width:100%;height:auto}
+#detailbox{width:min(1500px,96vw)}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px}
+.detail-map{position:relative;background:#fff}
+.detail-map img{width:100%;display:block;cursor:crosshair}
+#detail-marker{position:absolute;border:3px solid var(--hl);pointer-events:none;box-shadow:0 0 0 1px #0008}
+#detail-canvas{display:block;width:100%;height:auto;background:#fff;border:1px solid var(--line)}
+#detail-status{margin:0 0 8px;font-size:13px;min-height:22px}
+.detail-nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+@media(max-width:760px){.detail-grid{grid-template-columns:1fr}.detail-low{max-width:440px;margin:auto}}
+@media(max-width:760px){
+ .tiles{grid-template-columns:1fr}
+ .answer-box{grid-template-columns:1fr}
+ main{padding:14px 16px 50px}
+}
+
+.detail-nav button,#detail-close{min-width:44px;min-height:44px}#detailbox{max-height:92dvh;overflow:auto}.detail-map img{user-select:none;-webkit-user-drag:none}.detail-high{min-width:0}
+@media(max-width:1024px) and (orientation:portrait){.detail-grid{grid-template-columns:1fr}.detail-low{width:min(100%,440px);margin:auto}}
+
+.detail-nav button[aria-pressed=true]{background:var(--purple);color:#fff;border-color:var(--purple)}
+#detail-marker{border-radius:50%}#detail-canvas{width:min(100%,65vh);margin:auto;cursor:grab}.detail-high .detail-nav{justify-content:center}
+</style>
+</head>
+<body>
+<nav style="padding:12px 24px;background:#f4f0f8"><a href="./" style="color:#65507f;text-decoration:none">← 病理實習主頁</a></nav>
+<header>
+ <h1>切片刷題機<small>94 個案例 · 整片模式／三格模式 · 先認器官再下診斷</small></h1>
+ <div class="controls">
+  <select id="scope" aria-label="出題範圍"><option value="">全部講次</option></select>
+  <select id="view" aria-label="顯示方式"><option value="full">整片模式</option><option value="three">三格模式</option></select>
+  <select id="mode" aria-label="出題方式"><option value="random">隨機・一輪不重複</option><option value="wrong">錯題重跑</option></select>
+  <button id="free-whole" type="button" hidden>整張圓形視野瀏覽</button>
+  <button id="clear-wrong" type="button">清空錯題</button>
+  <button id="log-btn" type="button">本輪紀錄 0</button>
+  <span class="stats" id="stats"></span>
+ </div>
+</header>
+<main>
+ <p class="note" id="coverage-note">第一次 35 例；第二、三次預習完整視野已上線 59/59 張，全部已完成。預習片尚未補授課辨識重點。PA0354 使用講義視野；指引 PA00289 暫對照學校 PA0289。</p>
+ <div class="qhead"><h2 id="qtitle">第 1 題</h2><p id="qhelp"></p></div>
+ <figure class="whole" id="whole"></figure>
+ <div class="tiles" id="tiles"></div>
+ <div id="full" hidden></div>
+ <form class="answer-box" id="form" autocomplete="off">
+  <div><label for="organ">Organ</label><input id="organ" placeholder="e.g. Lung"></div>
+  <div><label for="dx">Diagnosis</label><input id="dx" placeholder="e.g. Cryptococcosis"></div>
+  <button class="primary" type="submit" id="show">看答案</button>
+ </form>
+ <p class="note" id="qnote"></p>
+ <section class="reveal" id="reveal" aria-live="polite"></section>
+</main>
+<dialog id="lightbox" aria-label="放大檢視">
+ <div class="modalbar"><strong id="mtitle"></strong>
+  <div class="seg"><button id="m-lo" aria-pressed="true">整格預覽</button> <button id="m-hi" aria-pressed="false">圓形視野</button> <button id="m-pick" hidden>選位置看圓形視野</button> <button id="m-close">關閉 ×</button></div></div>
+ <p class="hint" id="mhint"></p><div id="viewer"><div class="stage"><img id="mimg" alt=""><div class="hibox" id="hibox" hidden><b>20× 範圍</b></div></div></div>
+</dialog>
+<dialog id="logbox" aria-label="本輪紀錄">
+ <div class="modalbar"><strong>本輪紀錄</strong><button id="log-close">關閉 ×</button></div>
+ <div class="body" id="log-body"></div>
+ <div class="acts"><button class="primary" id="log-csv">暫停並下載 CSV</button><button id="log-copy">複製文字</button><button id="log-new">開始新一輪</button><span class="note" id="log-msg"></span></div>
+</dialog>
+<script src="quiz-data.js?v=20261009-59"></script>
+<script src="image-service.js?v=20261006-all35-34"></script>
+<script src="selectable-20x.js?v=20261006-fast2"></script>
+<script>
+'use strict';
+const Q=window.QUIZ_DATA,$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const GUIDE='https://zi-yiii.github.io/pathology-slide-guide/#';
+let requestedSlide=new URLSearchParams(location.search).get('slide');
+const get=(k,d)=>{try{return JSON.parse(localStorage.getItem('quiz:'+k))??d}catch{return d}},put=(k,v)=>{try{localStorage.setItem('quiz:'+k,JSON.stringify(v))}catch{}};
+let session=get('session',null);if(!session||!Array.isArray(session.items))session={start:new Date().toISOString(),items:[],exported:true};
+const saveSession=()=>{put('session',session);const b=$('#log-btn'),k=session.items.length;b.textContent=`本輪紀錄 ${k}${k&&!session.exported?' ・未匯出':''}`;b.classList.toggle('unsaved',k>0&&!session.exported)};
+let revealed=false,rec=get('rec',{}),n=0,cur=null,picks=[],modal=null,zoom=1;
+const ZOOMS=[1,1.5,2,3,4],HELP={three:['只看同一張玻片隨機的三格作答；整張全景要按「看答案」後才出現，避免變成認低倍輪廓。點格子放大後，可選位置進入圓形視野；10×／40×使用同一圖片解析度。','有些格子可能只有正常組織，請綜合三格判斷。整張切成 3mm 正方形格，組織太少的格子不出題。'],
+ full:['整張模式：把這張玻片所有可出題的格子拼回原位（約 4× 物鏡），可縮放、拖曳。點任一格可看大圖與圓形視野。','組織較少的格子以低倍全景補上，避免把未出題區域誤看成組織缺角。一題需載入二三十張圖，手機網路較慢。']};
+const lessons=[...new Map(Q.map(s=>[s.date,s.lesson])).entries()];
+for(const exam of [1,2,3])$('#scope').add(new Option(`第 ${exam} 次切片考試（${Q.filter(s=>s.exam===exam).length} 片）`,'exam'+exam));
+lessons.filter(([d])=>!d.startsWith('exam')).forEach(([d,l])=>$('#scope').add(new Option(`${d.slice(0,2)}/${d.slice(2)} · ${l}`,d)));
+$('#scope').value=new URLSearchParams(location.search).get('scope')||get('scope','');if($('#scope').selectedIndex<0)$('#scope').value='';$('#scope').onchange=()=>{requestedSlide=null;put('scope',$('#scope').value);next()};$('#mode').onchange=next;if(get('viewVersion','')!=='circle-full-1'){put('view','full');put('viewVersion','circle-full-1')}$('#view').value=get('view','full');$('#view').onchange=()=>{put('view',$('#view').value);render()};
+function pool(){let p=Q.filter(s=>!$('#scope').value||s.date===$('#scope').value||('exam'+s.exam)===$('#scope').value||('exam'+s.exam)===$('#scope').value||('exam'+s.exam)===$('#scope').value||('exam'+s.exam)===$('#scope').value);if($('#mode').value==='wrong'){const w=p.filter(s=>rec[s.id]?.pending??((rec[s.id]?.bad||0)>0));p=w}return p}
+function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function stats(){let ok=0,bad=0;Object.values(rec).forEach(r=>{ok+=r.ok||0;bad+=r.bad||0});const pending=Q.filter(s=>rec[s.id]?.pending??((rec[s.id]?.bad||0)>0)).length;$('#stats').textContent=`累計 ${ok} 對 / ${bad} 錯 · 待重跑 ${pending} · ${Q.length} 張玻片`;$('#clear-wrong').disabled=!pending}
+function base(s){return s.assetBase||`slides/${s.id}`}
+function src(s,c,hi){return `${base(s)}/r${c.r}c${c.c}.jpg`}
+function drawSlide(p){
+ const key=[$('#scope').value||'all',$('#mode').value,''].join('|'), allowed=new Set(p.map(s=>s.id));
+ let decks=get('decks',{});if(!decks||typeof decks!=='object'||Array.isArray(decks))decks={};
+ let d=decks[key];if(!d||!Array.isArray(d.seen)||!Array.isArray(d.left))d={seen:[],left:[],round:1};
+ d.seen=[...new Set(d.seen.filter(id=>typeof id==='string'))];d.left=[...new Set(d.left.filter(id=>allowed.has(id)&&!d.seen.includes(id)))];
+ d.left.push(...shuffle(p.map(s=>s.id).filter(id=>!d.seen.includes(id)&&!d.left.includes(id))));
+ if(!d.left.length){d={seen:[],left:shuffle(p.map(s=>s.id)),round:(Number(d.round)||1)+1};if(d.left.length>1&&d.left[0]===cur?.id)[d.left[0],d.left[1]]=[d.left[1],d.left[0]];}
+ if(requestedSlide&&allowed.has(requestedSlide)){d.left=d.left.filter(id=>id!==requestedSlide);d.left.unshift(requestedSlide);d.seen=d.seen.filter(id=>id!==requestedSlide)}requestedSlide=null;
+ const id=d.left.shift();d.seen.push(id);decks[key]=d;put('decks',decks);
+ return {slide:p.find(s=>s.id===id),round:d.round,index:d.seen.filter(id=>allowed.has(id)).length,total:p.length};
+}
+function next(){const p=pool();if(!p.length){cur=null;$('#free-whole').hidden=true;$('#qtitle').textContent=$('#mode').value==='wrong'?'這個範圍沒有錯題':'這個範圍沒有題目';$('#qhelp').textContent='請切換講次或出題方式。';$('#tiles').innerHTML='';$('#whole').hidden=$('#full').hidden=true;$('#reveal').className='reveal';$('#show').disabled=true;return}const draw=drawSlide(p),s=draw.slide;cur=s;n++;
+ picks=shuffle(s.cells).slice(0,3);zoom=1;revealed=false;
+ $('#qtitle').textContent=`第 ${draw.round} 輪 · ${draw.index} / ${draw.total}`;
+ $('#organ').value='';$('#dx').value='';$('#reveal').className='reveal';$('#reveal').innerHTML='';$('#show').disabled=false;$('#organ').focus({preventScroll:true});window.scrollTo({top:0});
+ render()}
+$('#free-whole').onclick=()=>Detail20x.open(cur);
+$('#clear-wrong').onclick=()=>{if(!confirm('清空全部待重跑錯題？歷史作答紀錄與對錯統計會保留。'))return;rec=get('rec',{});for(const r of Object.values(rec))r.pending=false;put('rec',rec);const decks=get('decks',{});for(const key of Object.keys(decks))if(key.split('|')[1]==='wrong')delete decks[key];put('decks',decks);stats();if($('#mode').value==='wrong')next();};
+
+function render(){if(!cur)return;$('#free-whole').hidden=!Detail20x.available(cur);const s=cur,G=s.cols,H=s.rows,full=$('#view').value==='full';
+ if(full||s.lectureOnly){$('#whole').hidden=false;$('#tiles').hidden=$('#full').hidden=true;$('#qhelp').textContent=s.lectureOnly?'此案例提供講義視野；沒有校準倍率或可確認的線上原片。':Detail20x.available(s)?'圓形視野已開放：點低倍圖選位置，切換 10×／40× 查看細節。':'本片完整細節圖尚在上架，目前提供低倍全景與格子預覽。';$('#qnote').textContent='';$('#whole').innerHTML=s.lectureOnly?`<div class="tiles">${s.cells.map((c,i)=>`<button class="tile" data-i="${i}"><img src="${src(s,c)}" alt="講義視野 ${i+1}"><span>講義視野 ${i+1}</span></button>`).join('')}</div>`:`<div class="map" id="browse-map"><img src="${base(s)}/overview.jpg" alt="整張玻片低倍全景"></div><figcaption>${Detail20x.available(s)?'點選位置看圓形視野；方向鍵或拖曳右圖移動。':'圓形視野尚未開放；點圖可先看格子預覽。'}</figcaption>`;if(s.lectureOnly){document.querySelectorAll('#whole .tile').forEach(b=>b.onclick=()=>open(s.cells[Number(b.dataset.i)],'講義視野'));}else{$('#browse-map').onclick=e=>{if(Detail20x.available(s)){const r=$('#browse-map img').getBoundingClientRect();Detail20x.open(s,null,(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height)}else{open(s.cells[0],'格子預覽')}}}return;}
+ [$('#qhelp').textContent,$('#qnote').textContent]=HELP[full?'full':'three'];
+ $('#whole').hidden=full||!revealed;$('#tiles').hidden=full;$('#full').hidden=!full;
+ $('#whole').innerHTML=`<div class="map" id="wmap"><img src="${base(s)}/overview.jpg" alt="整張玻片低倍全景">${picks.map((c,i)=>`<div class="box" style="left:${c.c/G*100}%;top:${c.r/H*100}%;width:${100/G}%;height:${100/H}%"><b>${'ABC'[i]}</b></div>`).join('')}</div><figcaption>答案揭曉：整張玻片低倍全景，黃框是本題三格的位置（點圖放大）</figcaption>`;
+ $('#wmap').onclick=()=>{modal=null;$('#m-pick').hidden=!Detail20x.available(cur);$('#mimg').src=`${base(s)}/overview.jpg`;$('#mtitle').textContent='整張玻片低倍全景';$('#m-lo').hidden=$('#m-hi').hidden=true;$('#hibox').hidden=true;$('#mhint').hidden=true;$('#lightbox').showModal()};
+ $('#tiles').innerHTML=picks.map((c,i)=>`<button class="tile" data-i="${i}" aria-label="放大第 ${i+1} 格"><img src="${src(s,c)}" alt="第 ${i+1} 格"><span><b>${'ABC'[i]}</b><span>點圖放大 · 可看圓形視野</span></span></button>`).join('');
+ document.querySelectorAll('.tile').forEach(b=>b.onclick=()=>open(picks[Number(b.dataset.i)],'ABC'[Number(b.dataset.i)]));
+ // 預載 20×
+ picks.forEach(c=>{const im=new Image();im.src=src(s,c,true)});
+}
+function open(c,label){modal={c,label};$('#m-pick').hidden=!Detail20x.available(cur);$('#m-lo').hidden=cur.lectureOnly;$('#m-hi').hidden=!Detail20x.available(cur);setHi(false);$('#lightbox').showModal()}
+function setHi(hi){if(hi&&Detail20x.available(cur)){$('#lightbox').close();Detail20x.open(cur,modal.c);return;}modal.hi=false;const c=modal.c,im=$('#mimg'),bx=$('#hibox');im.src=src(cur,c,hi);
+ $('#mtitle').textContent=cur.lectureOnly?'講義視野 · 無校準倍率':`${modal.label} · ${hi?`格內 20×（約 ${cur.hiMM[0]}×${cur.hiMM[1]} mm）`:`整格（約 ${cur.cellMM[0]}×${cur.cellMM[1]} mm）`}`;
+ $('#mhint').textContent=hi?'20× 只涵蓋整格中的一小塊（整格裡黃框的位置）；其他區域請看整格圖。':(Detail20x.available(cur)?'點這張低倍圖任一位置，查看該處圓形視野。':'黃框是「格內 20×」拍攝的範圍，只占整格的一小部分。');$('#mhint').hidden=cur.lectureOnly;
+ const fx=c.hx*cur.cols-c.c,fy=c.hy*cur.rows-c.r,w=cur.hiMM[0]/cur.cellMM[0],h=cur.hiMM[1]/cur.cellMM[1];
+ Object.assign(bx.style,{left:`${Math.max(0,fx-w/2)*100}%`,top:`${Math.max(0,fy-h/2)*100}%`,width:`${w*100}%`,height:`${h*100}%`});bx.hidden=true;
+ $('#m-lo').setAttribute('aria-pressed',!hi);$('#m-hi').setAttribute('aria-pressed',hi)}
+$('#mimg').onclick=e=>{if(!Detail20x.available(cur)||modal?.hi)return;const r=e.currentTarget.getBoundingClientRect(),fx=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),fy=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));const c=modal?.c||null;$('#lightbox').close();Detail20x.open(cur,c,fx,fy)};
+$('#m-pick').onclick=()=>{const cell=modal?.c||null;$('#lightbox').close();Detail20x.open(cur,cell)};
+$('#m-lo').onclick=()=>setHi(false);$('#m-hi').onclick=()=>setHi(true);$('#m-close').onclick=()=>$('#lightbox').close();
+$('#form').onsubmit=e=>{e.preventDefault();const s=cur;$('#show').disabled=true;
+ const full=$('#view').value==='full';
+ session.items.push({t:new Date().toISOString(),id:s.id,organ:s.organ,dx:s.diagnosis,myOrgan:$('#organ').value.trim(),myDx:$('#dx').value.trim(),grade:'',view:s.lectureOnly?'講義視野':full?'整片':'三格',cells:full?'全部':picks.map(c=>`r${c.r+1}c${c.c+1}`).join(' ')});session.exported=false;saveSession();
+ const item=session.items[session.items.length-1];
+ revealed=true;if(!full)$('#whole').hidden=false;
+ const mine=($('#organ').value||$('#dx').value)?`<div class="mine">你的答案：${esc($('#organ').value)||'—'} ／ ${esc($('#dx').value)||'—'}</div>`:'';
+ $('#reveal').innerHTML=`<div><p class="note">${esc(s.id)} · ${s.date.slice(0,2)}/${s.date.slice(2)} ${esc(s.lesson)}</p><h3>${esc(s.organ)} · ${esc(s.diagnosis)}</h3><p class="zh">${esc(s.zh)}</p>${mine}<strong>Description（講義答案頁）</strong><ol>${s.pairs.map(p=>`<li>${esc(p)}</li>`).join('')}</ol>${s.extra.length?`<p class="extra">補充：${s.extra.map(esc).join('；')}</p>`:''}<p><a href="${GUIDE+s.id}" target="_blank" rel="noopener">到切片導讀看這一片 →</a></p>
+ <div class="grade"><button class="ok" id="g-ok">我答對了</button><button class="bad" id="g-bad">答錯／不確定</button><button class="primary" id="g-next">下一題 →</button></div></div>
+`;
+ $('#reveal').className='reveal show';
+ const grade=k=>{item.grade=k==='ok'?'對':'錯';saveSession();rec=get('rec',{});rec[s.id]=rec[s.id]||{};rec[s.id][k]=(rec[s.id][k]||0)+1;rec[s.id].pending=k==='bad';put('rec',rec);stats();next()};
+ $('#g-ok').onclick=()=>grade('ok');$('#g-bad').onclick=()=>grade('bad');$('#g-next').onclick=next;$('#reveal').scrollIntoView({behavior:'smooth',block:'start'})};
+function fmt(t){const d=new Date(t);return d.toLocaleString('zh-TW',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}
+function summary(){const it=session.items,ok=it.filter(x=>x.grade==='對').length,bad=it.filter(x=>x.grade==='錯').length;return {n:it.length,ok,bad,none:it.length-ok-bad}}
+function showLog(){const m=summary(),it=session.items;
+ $('#log-body').innerHTML=`<p class="sum">本輪開始於 ${fmt(session.start)} · 共 ${m.n} 題：<span class="g-ok">對 ${m.ok}</span> / <span class="g-bad">錯 ${m.bad}</span> / 未評 ${m.none}${session.exported?'（已匯出）':''}</p>`+(it.length?`<table><thead><tr><th>#</th><th>時間</th><th>玻片</th><th>正確答案</th><th>我的答案</th><th>自評</th><th>模式</th></tr></thead><tbody>${it.map((x,i)=>`<tr><td>${i+1}</td><td>${fmt(x.t)}</td><td>${esc(x.id)}</td><td>${esc(x.organ)} · ${esc(x.dx)}</td><td>${esc(x.myOrgan||'—')} · ${esc(x.myDx||'—')}</td><td class="${x.grade==='對'?'g-ok':x.grade==='錯'?'g-bad':''}">${x.grade||'未評'}</td><td>${x.view} ${esc(x.cells)}</td></tr>`).join('')}</tbody></table>`:'<p class="note">這一輪還沒有作答紀錄。按「看答案」後就會記下來。</p>');
+ $('#log-msg').textContent='';$('#logbox').showModal()}
+function csv(){const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;const head=['#','時間','玻片','正確器官','正確診斷','我的器官','我的診斷','自評','模式','格子'];
+ return '\ufeff'+[head,...session.items.map((x,i)=>[i+1,fmt(x.t),x.id,x.organ,x.dx,x.myOrgan,x.myDx,x.grade||'未評',x.view,x.cells])].map(r=>r.map(q).join(',')).join('\r\n')}
+function text(){const m=summary();return `切片刷題 本輪紀錄（${fmt(session.start)} 起，共 ${m.n} 題：對 ${m.ok}／錯 ${m.bad}／未評 ${m.none}）\n`+session.items.map((x,i)=>`${i+1}. ${x.id} 正解 ${x.organ} · ${x.dx}｜我答 ${x.myOrgan||'—'} · ${x.myDx||'—'}｜${x.grade||'未評'}`).join('\n')}
+$('#log-btn').onclick=showLog;$('#log-close').onclick=()=>$('#logbox').close();
+$('#log-csv').onclick=()=>{if(!session.items.length)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv()],{type:'text/csv;charset=utf-8'}));const d=new Date(session.start);a.download=`切片刷題_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);session.exported=true;saveSession();showLog();$('#log-msg').textContent='已下載。'};
+$('#log-copy').onclick=async()=>{if(!session.items.length)return;try{await navigator.clipboard.writeText(text());session.exported=true;saveSession();showLog();$('#log-msg').textContent='已複製，可貼到筆記。'}catch{$('#log-msg').textContent='無法存取剪貼簿，請改用下載 CSV。'}};
+$('#log-new').onclick=()=>{if(session.items.length&&!session.exported&&!confirm('這一輪還沒匯出，確定要清掉並開始新一輪嗎？'))return;session={start:new Date().toISOString(),items:[],exported:true};put('decks',{});saveSession();next();showLog()};
+// 有未匯出的紀錄時，關閉或重新整理前提醒（瀏覽器只會顯示它自己的提示文字）
+window.addEventListener('beforeunload',e=>{if(session.items.length&&!session.exported){e.preventDefault();e.returnValue=''}});
+window.addEventListener('storage',e=>{if(e.key!=='quiz:rec')return;rec=get('rec',{});stats();if($('#mode').value==='wrong'&&(!cur||!(rec[cur.id]?.pending??((rec[cur.id]?.bad||0)>0))))next()});
+saveSession();stats();next();
+</script>
+</body>
+</html>
