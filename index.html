@@ -104,7 +104,7 @@ dialog::backdrop{background:#16121bdd}
 </head>
 <body>
 <header>
- <h1>切片刷題機<small>35 個案例 · 整片模式／三格模式 · 先認器官再下診斷</small></h1>
+ <h1>切片刷題機<small>86 個案例 · 整片模式／三格模式 · 先認器官再下診斷</small></h1>
  <div class="controls">
   <select id="scope" aria-label="出題範圍"><option value="">全部講次</option></select>
   <select id="view" aria-label="顯示方式"><option value="full">整片模式</option><option value="three">三格模式</option></select>
@@ -116,7 +116,7 @@ dialog::backdrop{background:#16121bdd}
  </div>
 </header>
 <main>
- <p class="note" id="coverage-note">35 個案例已收錄；34/34 張原片已支援整張自由選點與 10×／40× 圓形視野（同一圖片解析度）。PA0354 提供講義視野，無校準倍率或整張自由選點。</p>
+ <p class="note" id="coverage-note">第一次 35 例；第二、三次預習完整視野已上線 51/59 張，其餘分批上架。預習片尚未補授課辨識重點。PA0354 使用講義視野；指引 PA00289 暫對照學校 PA0289。</p>
  <div class="qhead"><h2 id="qtitle">第 1 題</h2><p id="qhelp"></p></div>
  <figure class="whole" id="whole"></figure>
  <div class="tiles" id="tiles"></div>
@@ -139,7 +139,7 @@ dialog::backdrop{background:#16121bdd}
  <div class="body" id="log-body"></div>
  <div class="acts"><button class="primary" id="log-csv">暫停並下載 CSV</button><button id="log-copy">複製文字</button><button id="log-new">開始新一輪</button><span class="note" id="log-msg"></span></div>
 </dialog>
-<script src="quiz-data.js?v=20261006-all35-34"></script>
+<script src="quiz-data.js?v=20261009-51"></script>
 <script src="image-service.js?v=20261006-all35-34"></script>
 <script src="selectable-20x.js?v=20261006-fast2"></script>
 <script>
@@ -154,9 +154,10 @@ let revealed=false,rec=get('rec',{}),n=0,cur=null,picks=[],modal=null,zoom=1;
 const ZOOMS=[1,1.5,2,3,4],HELP={three:['只看同一張玻片隨機的三格作答；整張全景要按「看答案」後才出現，避免變成認低倍輪廓。點格子放大後，可選位置進入圓形視野；10×／40×使用同一圖片解析度。','有些格子可能只有正常組織，請綜合三格判斷。整張切成 3mm 正方形格，組織太少的格子不出題。'],
  full:['整張模式：把這張玻片所有可出題的格子拼回原位（約 4× 物鏡），可縮放、拖曳。點任一格可看大圖與圓形視野。','組織較少的格子以低倍全景補上，避免把未出題區域誤看成組織缺角。一題需載入二三十張圖，手機網路較慢。']};
 const lessons=[...new Map(Q.map(s=>[s.date,s.lesson])).entries()];
-lessons.forEach(([d,l])=>$('#scope').add(new Option(`${d.slice(0,2)}/${d.slice(2)} · ${l}`,d)));
+for(const exam of [1,2,3])$('#scope').add(new Option(`第 ${exam} 次切片考試（${Q.filter(s=>s.exam===exam).length} 片）`,'exam'+exam));
+lessons.filter(([d])=>!d.startsWith('exam')).forEach(([d,l])=>$('#scope').add(new Option(`${d.slice(0,2)}/${d.slice(2)} · ${l}`,d)));
 $('#scope').value=new URLSearchParams(location.search).get('scope')||get('scope','');if($('#scope').selectedIndex<0)$('#scope').value='';$('#scope').onchange=()=>{requestedSlide=null;put('scope',$('#scope').value);next()};$('#mode').onchange=next;if(get('viewVersion','')!=='circle-full-1'){put('view','full');put('viewVersion','circle-full-1')}$('#view').value=get('view','full');$('#view').onchange=()=>{put('view',$('#view').value);render()};
-function pool(){let p=Q.filter(s=>!$('#scope').value||s.date===$('#scope').value);if($('#mode').value==='wrong'){const w=p.filter(s=>rec[s.id]?.pending??((rec[s.id]?.bad||0)>0));p=w}return p}
+function pool(){let p=Q.filter(s=>!$('#scope').value||s.date===$('#scope').value||('exam'+s.exam)===$('#scope').value);if($('#mode').value==='wrong'){const w=p.filter(s=>rec[s.id]?.pending??((rec[s.id]?.bad||0)>0));p=w}return p}
 function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function stats(){let ok=0,bad=0;Object.values(rec).forEach(r=>{ok+=r.ok||0;bad+=r.bad||0});const pending=Q.filter(s=>rec[s.id]?.pending??((rec[s.id]?.bad||0)>0)).length;$('#stats').textContent=`累計 ${ok} 對 / ${bad} 錯 · 待重跑 ${pending} · ${Q.length} 張玻片`;$('#clear-wrong').disabled=!pending}
 function base(s){return s.assetBase||`slides/${s.id}`}
